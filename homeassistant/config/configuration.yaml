@@ -1,0 +1,45 @@
+# Home Assistant — конфигурация IoT-фермы.
+#
+# Подключение к брокеру MQTT добавляется ОДИН раз через интерфейс:
+#   Настройки → Устройства и службы → Добавить интеграцию → MQTT →
+#   хост: mosquitto, порт: 1883, логин: mqtt_exp, пароль: pass_mqtt
+# (контейнеры видят брокер по имени сервиса 'mosquitto'; на ВМ — по IP).
+#
+# Ниже — 4 сенсора фермы: подписка на топики farm/ilya/<датчик> и парсинг JSON.
+# state_class: measurement включает долговременную статистику и графики в «Истории».
+
+default_config:
+
+mqtt:
+  sensor:
+    - name: "Температура теплицы"
+      unique_id: farm_ilya_temperature
+      state_topic: "farm/ilya/temperature"
+      value_template: "{{ value_json.value }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+
+    - name: "Влажность теплицы"
+      unique_id: farm_ilya_humidity
+      state_topic: "farm/ilya/humidity"
+      value_template: "{{ value_json.value }}"
+      unit_of_measurement: "%"
+      device_class: humidity
+      state_class: measurement
+
+    - name: "Освещённость теплицы"
+      unique_id: farm_ilya_light
+      state_topic: "farm/ilya/light"
+      value_template: "{{ value_json.value }}"
+      unit_of_measurement: "lx"
+      device_class: illuminance
+      state_class: measurement
+
+    - name: "CO2 теплицы"
+      unique_id: farm_ilya_co2
+      state_topic: "farm/ilya/co2"
+      value_template: "{{ value_json.value }}"
+      unit_of_measurement: "ppm"
+      device_class: carbon_dioxide
+      state_class: measurement

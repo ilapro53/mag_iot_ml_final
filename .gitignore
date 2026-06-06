@@ -1,0 +1,30 @@
+# --- Python / uv ---
+.venv/
+__pycache__/
+*.py[cod]
+
+# --- Сгенерированные графики визуализатора ---
+viz/out/
+
+# --- Runtime-файлы Home Assistant ---
+# configuration.yaml отслеживаем, всё остальное (база истории, .storage, логи) — нет.
+homeassistant/config/*
+!homeassistant/config/configuration.yaml
+
+# --- Файл паролей брокера (генерится при старте в data-томе) ---
+broker/passwd
+
+# --- Локальные настройки инструментов / ОС ---
+.claude/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- vscode ---
+.vscode/
+
+# --- Материалы --- #
+local/
+
+# Примечание: .env и пресеты (.env.fast/.env.realtime/.env.example) ОТСЛЕЖИВАЮТСЯ —
+# это демо-конфиг с учебными кредами, нужен для воспроизводимости стенда.

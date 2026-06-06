@@ -1,0 +1,71 @@
+# IoT-ферма — Docker-стенд.
+# ФАЗА 1: пока только брокер. Сенсор и Home Assistant добавим на следующих этапах.
+#
+# Запуск:  docker compose up -d
+# Логи:    docker compose logs -f mosquitto
+# Стоп:    docker compose down
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: farm-mosquitto
+    restart: unless-stopped
+    ports:
+      # Внутри Docker брокер всегда слушает 1883 (сенсор и HA ходят к нему по сети Docker).
+      # На хост (Windows) публикуем через MQTT_HOST_PORT — Windows иногда резервирует 1883,
+      # тогда в .env ставим, напр., 18883. На контейнеры и миграцию на ВМ это не влияет.
+      - "${MQTT_HOST_PORT:-1883}:1883"
+    env_file: .env
+    volumes:
+      - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    # При старте: (1) на всякий случай чистим старый файл паролей, (2) генерируем новый из .env,
+    # (3) отдаём его пользователю mosquitto (демон работает от него и иначе не прочитает),
+    # (4) запускаем брокер. Пароль нигде не лежит в репозитории, стенд воспроизводим.
+    # $$ — экранированный $, чтобы переменную раскрывал shell ВНУТРИ контейнера (не Compose).
+    command: >
+      sh -c "rm -f /mosquitto/data/passwd &&
+             mosquitto_passwd -b -c /mosquitto/data/passwd \"$$MQTT_USER\" \"$$MQTT_PASSWORD\" &&
+             chown mosquitto:mosquitto /mosquitto/data/passwd &&
+             exec mosquitto -c /mosquitto/config/mosquitto.conf"
+
+  # --- ФАЗА 2: датчик-эмулятор (4 датчика фермы, публикует JSON в брокер) ---
+  sensor:
+    build: ./sensor
+    container_name: farm-sensor
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    env_file: .env          # MQTT_HOST=mosquitto -> подключение к брокеру по сети Docker
+    environment:
+      - TZ=MSK-3            # часовой пояс для старта суточного цикла от РЕАЛЬНОГО времени (Москва UTC+3; смени под свой)
+
+  # --- ФАЗА 3: Home Assistant (подписчик + визуализация/история) ---
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: farm-homeassistant
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      - TZ=Europe/Moscow
+    volumes:
+      - ./homeassistant/config:/config     # конфиг и БД истории хранятся здесь
+    ports:
+      - "${HA_HOST_PORT:-8123}:8123"        # веб-интерфейс: http://localhost:8123
+
+  # --- ФАЗА 4 (по требованию): визуализатор -> PNG с 4 графиками ---
+  # Не стартует с обычным `up`. Запуск:  docker compose --profile tools run --rm viz
+  # Результат: viz/out/graphs.png. Для ЖИВОГО окна запускай visualize.py с хоста.
+  viz:
+    build: ./viz
+    profiles: ["tools"]
+    depends_on:
+      - mosquitto
+    env_file: .env                          # отсюда берёт MQTT_USER/MQTT_PASSWORD
+    command: ["--host", "mosquitto", "--port", "1883", "--save", "/out/graphs.png", "--duration", "60"]
+    volumes:
+      - ./viz/out:/out
+
+volumes:
+  mosquitto-data:
