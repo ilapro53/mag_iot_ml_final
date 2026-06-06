@@ -206,8 +206,7 @@ docker compose exec mosquitto mosquitto_pub -t farm/ilya/control -m temperature 
 ├── sensor/                         датчик-эмулятор (sensor_emulator.py + Dockerfile)
 ├── homeassistant/config/           configuration.yaml (4 MQTT-сенсора)
 ├── viz/                            visualize.py (4 графика), run.ps1, Dockerfile
-├── prev/                           исходная практика «ферма» (ноутбук + диаграмма)
-└── 00_ЗАДАНИЕ_и_план.md            конспект задания и плана
+└── local/                          личные материалы (задание, prev/, транскрипты) — в .gitignore
 ```
 
 ## Миграция на Ubuntu-ВМ (план)
