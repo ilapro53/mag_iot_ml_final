@@ -7,7 +7,7 @@ __pycache__/
 viz/out/
 
 # --- Runtime-файлы Home Assistant ---
-# configuration.yaml отслеживаем, всё остальное (база истории, .storage, логи) — нет.
+# configuration.yaml отслеживаем, все остальное (база истории, .storage, логи) - нет.
 homeassistant/config/*
 !homeassistant/config/configuration.yaml
 
@@ -26,5 +26,5 @@ desktop.ini
 # --- Материалы --- #
 local/
 
-# Примечание: .env и пресеты (.env.fast/.env.realtime/.env.example) ОТСЛЕЖИВАЮТСЯ —
+# Примечание: .env и пресеты (.env.fast/.env.realtime/.env.example) ОТСЛЕЖИВАЮТСЯ,
 # это демо-конфиг с учебными кредами, нужен для воспроизводимости стенда.

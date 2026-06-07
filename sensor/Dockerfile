@@ -2,8 +2,8 @@
 #   sudo apt install python3-pip -y && pip install paho-mqtt && python3 sensor_emulator.py
 FROM python:3.12-slim
 
-# PYTHONUNBUFFERED — логи сразу в `docker compose logs` (не буферизуются)
-# PYTHONIOENCODING — корректный вывод символов °C/% в логах
+# PYTHONUNBUFFERED - логи сразу в `docker compose logs` (не буферизуются)
+# PYTHONIOENCODING - корректный вывод символов °C/% в логах
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8
 

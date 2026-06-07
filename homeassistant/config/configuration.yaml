@@ -1,12 +1,12 @@
-# Home Assistant — конфигурация IoT-фермы.
+# Home Assistant - конфигурация IoT-фермы.
 #
 # Подключение к брокеру MQTT добавляется ОДИН раз через интерфейс:
-#   Настройки → Устройства и службы → Добавить интеграцию → MQTT →
+#   Настройки, Устройства и службы, Добавить интеграцию, MQTT,
 #   хост: mosquitto, порт: 1883, логин: mqtt_exp, пароль: pass_mqtt
-# (контейнеры видят брокер по имени сервиса 'mosquitto'; на ВМ — по IP).
+# (контейнеры видят брокер по имени сервиса 'mosquitto'; на ВМ - по IP).
 #
-# Ниже — 4 сенсора фермы: подписка на топики farm/ilya/<датчик> и парсинг JSON.
-# state_class: measurement включает долговременную статистику и графики в «Истории».
+# Ниже - 4 сенсора фермы: подписка на топики farm/ilya/<датчик> и парсинг JSON.
+# state_class: measurement включает долговременную статистику и графики в "Истории".
 
 default_config:
 
@@ -28,7 +28,7 @@ mqtt:
       device_class: humidity
       state_class: measurement
 
-    - name: "Освещённость теплицы"
+    - name: "Освещенность теплицы"
       unique_id: farm_ilya_light
       state_topic: "farm/ilya/light"
       value_template: "{{ value_json.value }}"
