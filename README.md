@@ -264,6 +264,21 @@ BROKER_IP=192.168.2.205 bash 02_sensor_setup.sh && \
 - частоту держи по правилу `RATE_MULT = 1800 / DAY_PERIOD_SEC` (реальное время -> `0.02`),
   тогда суточная кривая гладкая, без мохнатого шума.
 
+**Ускоренное время (для показа цикла на защите)** - сутки за 30 минут, как пресет
+`.env.realtime` в Docker. Полный цикл день/ночь с погодой проигрывается за полчаса. Та же
+вставка, но с заданными режимом и частотой (действует при ПЕРВОМ запуске, пока `.env` еще нет):
+
+```bash
+mkdir -p ~/farm-sensor && cd ~/farm-sensor && \
+wget -O sensor_emulator.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
+wget -O 02_sensor_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
+BROKER_IP=192.168.2.205 DAY_PERIOD_SEC=1800 RATE_MULT=1 bash 02_sensor_setup.sh && \
+./run_sensor.sh
+```
+
+Если `.env` уже создан, эти переменные не подхватятся (скрипт его не перезатирает) - тогда
+правь `~/farm-sensor/.env` (`DAY_PERIOD_SEC=1800`, `RATE_MULT=1`) и перезапускай `./run_sensor.sh`.
+
 ### 3. Home Assistant
 
 Отдельная ВМ с Home Assistant OS. Добавить интеграцию **MQTT** (IP брокера, порт 1883,
