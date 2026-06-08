@@ -216,14 +216,15 @@ docker compose exec mosquitto mosquitto_pub -t farm/ilya/control -m temperature 
 
 Альтернатива Docker - 3 виртуалки: брокер, датчик, Home Assistant. У всех **сетевой мост**
 (не NAT), VPN на хосте выключен (он ломает мост). Репозиторий публичный, поэтому файлы
-тянутся прямо с GitHub - копировать вручную не нужно.
+тянутся прямо с GitHub - копировать вручную не нужно. Нужен `wget` (обычно есть; если нет -
+`sudo apt install -y wget`).
 
 ### 1. Брокер (Mosquitto)
 
 На ВМ-брокере одной вставкой - скачать скрипт и поднять брокер:
 
 ```bash
-curl -fsSL -O https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/01_broker_setup.sh
+wget -O 01_broker_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/01_broker_setup.sh
 sudo bash 01_broker_setup.sh
 ```
 
@@ -237,8 +238,8 @@ sudo bash 01_broker_setup.sh
 
 ```bash
 mkdir -p ~/farm-sensor && cd ~/farm-sensor && \
-curl -fsSL -O https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
-curl -fsSL -O https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
+wget -O sensor_emulator.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
+wget -O 02_sensor_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
 BROKER_IP=192.168.2.205 bash 02_sensor_setup.sh && \
 ./run_sensor.sh
 ```
