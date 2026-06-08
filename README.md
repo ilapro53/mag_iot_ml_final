@@ -206,13 +206,59 @@ docker compose exec mosquitto mosquitto_pub -t farm/ilya/control -m temperature 
 ├── pyproject.toml / uv.lock        зависимости визуализатора (paho-mqtt, matplotlib)
 ├── broker/mosquitto.conf           конфиг брокера
 ├── sensor/                         датчик-эмулятор (sensor_emulator.py и Dockerfile)
-├── homeassistant/config/           configuration.yaml (4 MQTT-сенсора)
+├── homeassistant/                  config/configuration.yaml (5 MQTT-сенсоров), dashboard-teplitsa.yaml
+├── scripts/                        установка на Ubuntu-ВМ (01_broker_setup.sh, 02_sensor_setup.sh)
 ├── viz/                            visualize.py (4 графика), run.ps1, Dockerfile
 └── local/                          личные материалы (задание, prev/, транскрипты) - в .gitignore
 ```
 
-## Миграция на Ubuntu-ВМ (план)
+## Развертывание на 3 Ubuntu-ВМ (сетевой мост)
 
-Те же файлы переносятся на 3 виртуалки с сетевым мостом: `mosquitto.conf` кладется в
-`/etc/mosquitto/`, `sensor_emulator.py` запускается через `python3` (изменить `MQTT_HOST` на IP
-брокер-ВМ), Home Assistant ставится отдельной ВМ. Скрипты установки появятся в `scripts/` (Фаза 5).
+Альтернатива Docker - 3 виртуалки: брокер, датчик, Home Assistant. У всех **сетевой мост**
+(не NAT), VPN на хосте выключен (он ломает мост). Репозиторий публичный, поэтому файлы
+тянутся прямо с GitHub - копировать вручную не нужно.
+
+### 1. Брокер (Mosquitto)
+
+На ВМ-брокере одной вставкой - скачать скрипт и поднять брокер:
+
+```bash
+curl -fsSL -O https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/01_broker_setup.sh
+sudo bash 01_broker_setup.sh
+```
+
+Скрипт ставит Mosquitto, заводит логин `mqtt_exp` / `pass_mqtt`, порт 1883, `allow_anonymous false`,
+сам себя проверяет (pub/sub плюс отказ анониму) и в конце печатает **IP брокера** - запиши его,
+он нужен датчику и Home Assistant.
+
+### 2. Датчик (эмулятор)
+
+На ВМ-датчике одной вставкой - скачать, настроить и запустить (подставь IP брокера вместо примера):
+
+```bash
+mkdir -p ~/farm-sensor && cd ~/farm-sensor && \
+curl -fsSL -O https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
+curl -fsSL -O https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
+BROKER_IP=192.168.2.205 bash 02_sensor_setup.sh && \
+./run_sensor.sh
+```
+
+Скрипт ставит Python и `paho-mqtt` в venv, кладет настройки в `~/farm-sensor/.env`, создает
+обертку `run_sensor.sh` и запускает датчик (видно консоль публикаций). Дальше режим меняется
+правкой `.env` и перезапуском `./run_sensor.sh`:
+
+- `DAY_PERIOD_SEC=86400` - реальное время (сутки = настоящие сутки);
+- `DAY_PERIOD_SEC=1800` - сутки за 30 минут (для показа полного цикла);
+- частоту держи по правилу `RATE_MULT = 1800 / DAY_PERIOD_SEC` (реальное время -> `0.02`),
+  тогда суточная кривая гладкая, без мохнатого шума.
+
+### 3. Home Assistant
+
+Отдельная ВМ с Home Assistant OS. Добавить интеграцию **MQTT** (IP брокера, порт 1883,
+`mqtt_exp` / `pass_mqtt`), в `configuration.yaml` дописать блок `mqtt:` из
+[homeassistant/config/configuration.yaml](homeassistant/config/configuration.yaml) (5 сенсоров,
+включая погоду), перезапустить. Готовый дашборд (гейджи, погода, графики истории) -
+[homeassistant/dashboard-teplitsa.yaml](homeassistant/dashboard-teplitsa.yaml).
+
+> Внимание: для ВМ Home Assistant не используй "Сохранить состояние" - при возобновлении
+> прыгают часы и ломается история. Выключай ВМ штатно или оставляй запущенной.
