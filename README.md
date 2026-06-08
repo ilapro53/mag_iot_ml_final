@@ -248,16 +248,16 @@ mosquitto_sub -h localhost -t 'farm/ilya/#' -u mqtt_exp -P pass_mqtt -v   # са
 На ВМ-датчике одной вставкой - скачать, настроить и запустить (подставь IP брокера вместо примера):
 
 ```bash
-mkdir -p ~/farm-sensor && cd ~/farm-sensor && \
-wget -O sensor_emulator.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
-wget -O 02_sensor_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
-BROKER_IP=192.168.2.205 bash 02_sensor_setup.sh && \
-./run_sensor.sh
+mkdir -p ~/farm-sensor && \
+wget -O ~/farm-sensor/sensor_emulator.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
+wget -O ~/farm-sensor/02_sensor_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
+BROKER_IP=192.168.2.205 bash ~/farm-sensor/02_sensor_setup.sh && \
+~/farm-sensor/run_sensor.sh
 ```
 
 Скрипт ставит Python и `paho-mqtt` в venv, кладет настройки в `~/farm-sensor/.env`, создает
 обертку `run_sensor.sh` и запускает датчик (видно консоль публикаций). Дальше режим меняется
-правкой `.env` и перезапуском `./run_sensor.sh`:
+правкой `.env` и перезапуском `~/farm-sensor/run_sensor.sh`:
 
 - `DAY_PERIOD_SEC=86400` - реальное время (сутки = настоящие сутки);
 - `DAY_PERIOD_SEC=1800` - сутки за 30 минут (для показа полного цикла);
@@ -269,15 +269,15 @@ BROKER_IP=192.168.2.205 bash 02_sensor_setup.sh && \
 заданными режимом и частотой (действует при ПЕРВОМ запуске, пока `.env` еще нет):
 
 ```bash
-mkdir -p ~/farm-sensor && cd ~/farm-sensor && \
-wget -O sensor_emulator.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
-wget -O 02_sensor_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
-BROKER_IP=192.168.2.205 DAY_PERIOD_SEC=37.5 RATE_MULT=4 bash 02_sensor_setup.sh && \
-./run_sensor.sh
+mkdir -p ~/farm-sensor && \
+wget -O ~/farm-sensor/sensor_emulator.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
+wget -O ~/farm-sensor/02_sensor_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
+BROKER_IP=192.168.2.205 DAY_PERIOD_SEC=37.5 RATE_MULT=4 bash ~/farm-sensor/02_sensor_setup.sh && \
+~/farm-sensor/run_sensor.sh
 ```
 
 Если `.env` уже создан, эти переменные не подхватятся (скрипт его не перезатирает) - тогда
-правь `~/farm-sensor/.env` (`DAY_PERIOD_SEC=37.5`, `RATE_MULT=4`) и перезапускай `./run_sensor.sh`.
+правь `~/farm-sensor/.env` (`DAY_PERIOD_SEC=37.5`, `RATE_MULT=4`) и перезапускай `~/farm-sensor/run_sensor.sh`.
 
 Этот режим хорош для Python-визуализатора (своя модельная ось времени). В Home Assistant ось
 реальная, поэтому при такой скорости сутки сильно сжимаются - для HA лучше реальное время или
