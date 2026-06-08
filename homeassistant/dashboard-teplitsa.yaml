@@ -1,0 +1,123 @@
+# Дашборд Home Assistant для тепличной фермы.
+#
+# Как применить: открыть нужную панель -> режим редактирования (карандаш) ->
+# меню (три точки) -> "Редактировать в YAML" (Raw configuration editor) -> вставить содержимое.
+#
+# Нужны 5 MQTT-сенсоров из configuration.yaml (farm_ilya_temperature/humidity/light/co2
+# и farm_ilya_weather). entity_id ожидаются: sensor.temperatura_teplitsy,
+# sensor.vlazhnost_teplitsy, sensor.osveshchennost_teplitsy, sensor.co2_teplitsy,
+# sensor.pogoda_v_teplitse. Если HA присвоил другие - поправить ниже.
+#
+# Раскладка: гейджи с зонами нормы (Сейчас), крупный баннер погоды по центру,
+# 4 графика истории за сутки (2x2, пониженной высоты).
+
+views:
+  - type: sections
+    title: Теплица
+    sections:
+      - type: grid
+        column_span: 4
+        cards:
+          - type: heading
+            heading: Сейчас
+          - type: gauge
+            entity: sensor.temperatura_teplitsy
+            name: Температура
+            min: 10
+            max: 35
+            needle: true
+            severity:
+              green: 18
+              yellow: 28
+              red: 31
+            grid_options:
+              columns: 12
+          - type: gauge
+            entity: sensor.vlazhnost_teplitsy
+            name: Влажность
+            min: 35
+            max: 90
+            needle: true
+            severity:
+              green: 50
+              yellow: 80
+              red: 85
+            grid_options:
+              columns: 12
+          - type: gauge
+            entity: sensor.osveshchennost_teplitsy
+            name: Освещенность
+            min: 0
+            max: 70000
+            needle: true
+            severity:
+              green: 5000
+              yellow: 50000
+              red: 62000
+            grid_options:
+              columns: 12
+          - type: gauge
+            entity: sensor.co2_teplitsy
+            name: CO2
+            min: 400
+            max: 1500
+            needle: true
+            severity:
+              green: 400
+              yellow: 1200
+              red: 1400
+            grid_options:
+              columns: 12
+      - type: grid
+        column_span: 4
+        cards:
+          - type: markdown
+            content: >
+              <h1 style="text-align: center; font-size: 2.6em; margin: 18px 0;">{{
+              states('sensor.pogoda_v_teplitse') }}</h1>
+            grid_options:
+              columns: full
+      - type: grid
+        column_span: 4
+        cards:
+          - type: heading
+            heading: История за день
+          - type: history-graph
+            entities:
+              - entity: sensor.temperatura_teplitsy
+            hours_to_show: 24
+            grid_options:
+              columns: 24
+              rows: 4
+          - type: history-graph
+            entities:
+              - entity: sensor.vlazhnost_teplitsy
+            hours_to_show: 24
+            grid_options:
+              columns: 24
+              rows: 4
+          - type: history-graph
+            entities:
+              - entity: sensor.osveshchennost_teplitsy
+            hours_to_show: 24
+            grid_options:
+              columns: 24
+              rows: 4
+          - type: history-graph
+            entities:
+              - entity: sensor.co2_teplitsy
+            hours_to_show: 24
+            grid_options:
+              columns: 24
+              rows: 4
+    badges:
+      - type: entity
+        entity: sensor.pogoda_v_teplitse
+      - type: entity
+        entity: sensor.temperatura_teplitsy
+      - type: entity
+        entity: sensor.vlazhnost_teplitsy
+      - type: entity
+        entity: sensor.osveshchennost_teplitsy
+      - type: entity
+        entity: sensor.co2_teplitsy
