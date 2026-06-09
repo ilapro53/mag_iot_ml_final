@@ -3,13 +3,14 @@
 # Как применить: открыть нужную панель -> режим редактирования (карандаш) ->
 # меню (три точки) -> "Редактировать в YAML" (Raw configuration editor) -> вставить содержимое.
 #
-# Нужны 5 MQTT-сенсоров из configuration.yaml (farm_ilya_temperature/humidity/light/co2
-# и farm_ilya_weather). entity_id ожидаются: sensor.temperatura_teplitsy,
-# sensor.vlazhnost_teplitsy, sensor.osveshchennost_teplitsy, sensor.co2_teplitsy,
-# sensor.pogoda_v_teplitse. Если HA присвоил другие - поправить ниже.
+# Нужны сенсоры и переключатели из configuration.yaml. entity_id ожидаются:
+# sensor.temperatura_teplitsy, sensor.vlazhnost_teplitsy, sensor.osveshchennost_teplitsy,
+# sensor.osveshchennost_snaruzhi (свет снаружи), sensor.co2_teplitsy, sensor.pogoda_v_teplitse,
+# switch.obogrev_teplitsy, switch.provetrivanie_teplitsy, switch.dosvetka_teplitsy.
+# Если HA присвоил другие - поправить ниже.
 #
-# Раскладка: гейджи с зонами нормы (Сейчас), крупный баннер погоды по центру,
-# 4 графика истории за сутки (2x2, пониженной высоты).
+# Раскладка: гейджи (Сейчас), переключатели актуаторов (Управление), баннер погоды,
+# графики истории за сутки (свет внутри/снаружи в одном, актуаторы полосами).
 
 views:
   - type: sections
@@ -71,6 +72,26 @@ views:
       - type: grid
         column_span: 4
         cards:
+          - type: heading
+            heading: Управление (актуаторы)
+          - type: tile
+            entity: switch.obogrev_teplitsy
+            name: Обогрев
+            grid_options:
+              columns: 16
+          - type: tile
+            entity: switch.provetrivanie_teplitsy
+            name: Проветривание
+            grid_options:
+              columns: 16
+          - type: tile
+            entity: switch.dosvetka_teplitsy
+            name: Досветка
+            grid_options:
+              columns: 16
+      - type: grid
+        column_span: 4
+        cards:
           - type: markdown
             content: >
               <h1 style="text-align: center; font-size: 2.6em; margin: 18px 0;">{{
@@ -97,8 +118,10 @@ views:
               columns: 24
               rows: 4
           - type: history-graph
+            title: Освещенность внутри и снаружи
             entities:
               - entity: sensor.osveshchennost_teplitsy
+              - entity: sensor.osveshchennost_snaruzhi
             hours_to_show: 24
             grid_options:
               columns: 24
@@ -110,6 +133,16 @@ views:
             grid_options:
               columns: 24
               rows: 4
+          - type: history-graph
+            title: Актуаторы (вкл/выкл)
+            entities:
+              - entity: switch.obogrev_teplitsy
+              - entity: switch.provetrivanie_teplitsy
+              - entity: switch.dosvetka_teplitsy
+            hours_to_show: 24
+            grid_options:
+              columns: 48
+              rows: 3
     badges:
       - type: entity
         entity: sensor.pogoda_v_teplitse
