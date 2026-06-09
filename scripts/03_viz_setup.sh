@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Настройка Python-визуализатора (matplotlib, 4 живых графика) на Ubuntu-ВМ.
-# Обычно ставится на брокер-ВМ: там брокер - это localhost, и есть рабочий стол для окна графиков.
+# Настройка Python-визуализатора (matplotlib, 4 графика) на Ubuntu-ВМ через uv.
+# uv сам приносит Python и ставит paho-mqtt и matplotlib (метаданные PEP 723 в visualize.py). sudo НЕ нужен.
+# Обычно ставится на брокер-ВМ: там брокер - localhost, и есть рабочий стол для окна графиков.
 #
 # ВАЖНО: рядом с этим скриптом должен лежать visualize.py.
-# Запускать БЕЗ sudo (sudo нужен только для apt внутри):
+# Запуск:
 #   chmod +x 03_viz_setup.sh
 #   ./03_viz_setup.sh
 # Если визуализатор не на брокер-ВМ - задать адрес брокера:
@@ -23,31 +24,32 @@ if [ ! -f "${WORKDIR}/visualize.py" ]; then
     exit 1
 fi
 
-echo "=== 1. Системные пакеты (python3, venv, pip, tk для окна, шрифты эмодзи) ==="
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip python3-tk fonts-noto-color-emoji
+echo "=== 1. Установка uv (если еще нет) ==="
+if ! command -v uv >/dev/null 2>&1 && [ ! -x "${HOME}/.local/bin/uv" ]; then
+    wget -qO- https://astral.sh/uv/install.sh | sh
+fi
+export PATH="${HOME}/.local/bin:${PATH}"
+uv --version
 
-echo "=== 2. Виртуальное окружение (paho-mqtt 2.x, matplotlib) ==="
-python3 -m venv "${WORKDIR}/.venv"
-"${WORKDIR}/.venv/bin/pip" install --upgrade pip
-"${WORKDIR}/.venv/bin/pip" install "paho-mqtt>=2,<3" "matplotlib>=3.7"
-
-echo "=== 3. Обертка запуска run_viz.sh (host/port брокера зашиты) ==="
+echo "=== 2. Обертка запуска run_viz.sh (uv run, host/port брокера зашиты) ==="
 cat > "${WORKDIR}/run_viz.sh" <<EOF
 #!/usr/bin/env bash
-# Запуск визуализатора. Адрес брокера зашит, доп. флаги передаются дальше (\$@), напр.:
-#   ./run_viz.sh --window 24                 окно поуже по времени
+# Запуск визуализатора через uv (paho-mqtt и matplotlib из PEP 723 в visualize.py).
+# Адрес брокера зашит, доп. флаги передаются дальше (\$@), напр.:
+#   ./run_viz.sh --window 24                       окно поуже по времени
 #   ./run_viz.sh --save graphs.png --duration 60   сохранить PNG без окна
 cd "\$(dirname "\$0")"
-exec ./.venv/bin/python visualize.py --host "${BROKER_IP}" --port "${MQTT_PORT}" "\$@"
+export PATH="\${HOME}/.local/bin:\${PATH}"
+exec uv run visualize.py --host "${BROKER_IP}" --port "${MQTT_PORT}" "\$@"
 EOF
 chmod +x "${WORKDIR}/run_viz.sh"
 
 echo
 echo "==================================================="
-echo " Визуализатор готов. Брокер: ${BROKER_IP}:${MQTT_PORT}"
+echo " Визуализатор готов (через uv, без venv и sudo). Брокер: ${BROKER_IP}:${MQTT_PORT}"
 echo " Живое окно с 4 графиками (нужен рабочий стол ВМ, не SSH без X):"
 echo "   ${WORKDIR}/run_viz.sh"
 echo " Сохранить PNG без окна:"
 echo "   ${WORKDIR}/run_viz.sh --save graphs.png --duration 60"
+echo " Для цветных эмодзи погоды в заголовке (опц.): sudo apt install -y fonts-noto-color-emoji"
 echo "==================================================="
