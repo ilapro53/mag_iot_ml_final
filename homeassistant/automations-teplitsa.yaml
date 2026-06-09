@@ -8,6 +8,8 @@
 #
 # entity_id могут отличаться (HA транслитерирует имена) - проверь в Состояниях и поправь.
 # Пороги с гистерезисом (вкл при одном значении, выкл при другом), чтобы актуаторы не дребезжали.
+# for: 5 секунд на триггерах - антидребезг: значение должно продержаться за порогом, иначе
+# одиночный всплеск не сработает. Для реального времени можно увеличить (напр. минуты).
 
 # --- Обогрев: держим температуру 18..22 ---
 - id: farm_heater_on
@@ -18,6 +20,8 @@
     - trigger: numeric_state
       entity_id: sensor.temperatura_teplitsy
       below: 18
+      for:
+        seconds: 5
   conditions: []
   actions:
     - action: switch.turn_on
@@ -32,6 +36,8 @@
     - trigger: numeric_state
       entity_id: sensor.temperatura_teplitsy
       above: 22
+      for:
+        seconds: 5
   conditions: []
   actions:
     - action: switch.turn_off
@@ -47,12 +53,18 @@
     - trigger: numeric_state
       entity_id: sensor.vlazhnost_teplitsy
       above: 80
+      for:
+        seconds: 5
     - trigger: numeric_state
       entity_id: sensor.co2_teplitsy
       above: 1200
+      for:
+        seconds: 5
     - trigger: numeric_state
       entity_id: sensor.temperatura_teplitsy
       above: 28
+      for:
+        seconds: 5
   conditions: []
   actions:
     - action: switch.turn_on
@@ -67,12 +79,18 @@
     - trigger: numeric_state
       entity_id: sensor.vlazhnost_teplitsy
       below: 70
+      for:
+        seconds: 5
     - trigger: numeric_state
       entity_id: sensor.co2_teplitsy
       below: 1000
+      for:
+        seconds: 5
     - trigger: numeric_state
       entity_id: sensor.temperatura_teplitsy
       below: 26
+      for:
+        seconds: 5
   conditions:
     - condition: numeric_state
       entity_id: sensor.vlazhnost_teplitsy
@@ -97,6 +115,8 @@
     - trigger: numeric_state
       entity_id: sensor.osveshchennost_teplitsy
       below: 6000
+      for:
+        seconds: 5
   conditions:
     - condition: numeric_state
       entity_id: sensor.osveshchennost_snaruzhi
@@ -114,6 +134,8 @@
     - trigger: numeric_state
       entity_id: sensor.osveshchennost_snaruzhi
       above: 14000
+      for:
+        seconds: 5
   conditions: []
   actions:
     - action: switch.turn_off
