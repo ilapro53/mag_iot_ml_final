@@ -284,9 +284,13 @@ BROKER_IP=192.168.2.205 MODE=fast bash ~/farm-sensor/02_sensor_setup.sh
 
 Отдельная ВМ с Home Assistant OS. Добавить интеграцию **MQTT** (IP брокера, порт 1883,
 `mqtt_exp` / `pass_mqtt`), в `configuration.yaml` дописать блок `mqtt:` из
-[homeassistant/config/configuration.yaml](homeassistant/config/configuration.yaml) (5 сенсоров,
-включая погоду), перезапустить. Готовый дашборд (гейджи, погода, графики истории) -
-[homeassistant/dashboard-teplitsa.yaml](homeassistant/dashboard-teplitsa.yaml).
+[homeassistant/config/configuration.yaml](homeassistant/config/configuration.yaml) (6 сенсоров
+вкл. свет снаружи и погоду, плюс 3 переключателя-актуатора), перезапустить. Готовый дашборд
+(гейджи, погода, графики истории) - [homeassistant/dashboard-teplitsa.yaml](homeassistant/dashboard-teplitsa.yaml).
+
+Логику актуаторов (обогрев/проветривание/досветка) задают **автоматизации Home Assistant**
+(Настройки -> Автоматизации): триггер по критическому значению сенсора -> включить/выключить
+переключатель. Примеры - в разделе "Актуаторы" ниже.
 
 > Внимание: для ВМ Home Assistant не используй "Сохранить состояние" - при возобновлении
 > прыгают часы и ломается история. Выключай ВМ штатно или оставляй запущенной.
@@ -319,3 +323,86 @@ bash ~/farm-viz/03_viz_setup.sh && \
 
 Если визуализатор на отдельной ВМ (не на брокере) - укажи IP брокера при установке:
 `BROKER_IP=192.168.2.205 bash ~/farm-viz/03_viz_setup.sh`.
+
+### Актуаторы (управление из Home Assistant)
+
+Эмулятор кроме датчиков даёт 3 управляемых устройства: **обогрев**, **проветривание**,
+**досветка**. Их состоянием управляет Home Assistant: шлёт `ON/OFF` в `farm/ilya/<актуатор>/set`,
+эмулятор применяет эффект к модели (обогрев греет, проветривание сушит и сбивает CO2, досветка
+поднимает свет внутри) и отвечает состоянием в `farm/ilya/<актуатор>`. В HA это переключатели
+`switch.*` (уже в `configuration.yaml`).
+
+Чтобы знать, когда гасить досветку, есть два датчика света: **внутри** (`farm/ilya/light`) и
+**снаружи** (`farm/ilya/light_out`). Логику пишут в **Настройки -> Автоматизации** (триггер по
+критическому значению -> включить/выключить переключатель). На каждый актуатор - пара
+"включить/выключить" с гистерезисом. Примеры (вставляются в режиме YAML у новой автоматизации):
+
+```yaml
+# Обогрев ВКЛ при низкой температуре
+alias: Обогрев вкл
+mode: single
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.temperatura_teplitsy
+    below: 18
+conditions: []
+actions:
+  - action: switch.turn_on
+    target:
+      entity_id: switch.obogrev_teplitsy
+```
+
+```yaml
+# Обогрев ВЫКЛ когда прогрелось (гистерезис: вкл < 18, выкл > 22)
+alias: Обогрев выкл
+mode: single
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.temperatura_teplitsy
+    above: 22
+conditions: []
+actions:
+  - action: switch.turn_off
+    target:
+      entity_id: switch.obogrev_teplitsy
+```
+
+```yaml
+# Досветка ВКЛ: внутри темно И снаружи света не хватает
+alias: Досветка вкл
+mode: single
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.osveshchennost_teplitsy
+    below: 6000
+conditions:
+  - condition: numeric_state
+    entity_id: sensor.osveshchennost_snaruzhi
+    below: 9000
+actions:
+  - action: switch.turn_on
+    target:
+      entity_id: switch.dosvetka_teplitsy
+```
+
+```yaml
+# Досветка ВЫКЛ когда снаружи стало светло
+alias: Досветка выкл
+mode: single
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.osveshchennost_snaruzhi
+    above: 14000
+conditions: []
+actions:
+  - action: switch.turn_off
+    target:
+      entity_id: switch.dosvetka_teplitsy
+```
+
+**Проветривание** - по аналогии: ВКЛ при `sensor.vlazhnost_teplitsy` выше 80 или
+`sensor.co2_teplitsy` выше 1200; ВЫКЛ когда влажность ниже 70 и CO2 ниже 1000. Несколько триггеров
+в одной автоматизации срабатывают по "или"; для "и" на выключение используй два `condition`.
+
+> entity_id у тебя могут отличаться (HA транслитерирует имена) - проверь в Инструменты
+> разработчика -> Состояния и подставь свои.

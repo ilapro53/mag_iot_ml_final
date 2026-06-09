@@ -5,9 +5,10 @@
 #   хост: mosquitto, порт: 1883, логин: mqtt_exp, пароль: pass_mqtt
 # (контейнеры видят брокер по имени сервиса 'mosquitto'; на ВМ - по IP).
 #
-# Ниже - 4 числовых сенсора фермы плюс текстовый сенсор погоды:
-# подписка на топики farm/ilya/<датчик> и парсинг JSON.
+# Ниже - 5 числовых сенсоров (вкл. свет снаружи), текстовый сенсор погоды и 3 переключателя-
+# актуатора (обогрев, проветривание, досветка). Подписка на топики farm/ilya/<датчик>, JSON.
 # state_class: measurement включает долговременную статистику и графики в "Истории".
+# Логику вкл/выкл актуаторов задают автоматизации Home Assistant (раздел Настройки -> Автоматизации).
 
 default_config:
 
@@ -37,6 +38,14 @@ mqtt:
       device_class: illuminance
       state_class: measurement
 
+    - name: "Освещенность снаружи"
+      unique_id: farm_ilya_light_out
+      state_topic: "farm/ilya/light_out"
+      value_template: "{{ value_json.value }}"
+      unit_of_measurement: "lx"
+      device_class: illuminance
+      state_class: measurement
+
     - name: "CO2 теплицы"
       unique_id: farm_ilya_co2
       state_topic: "farm/ilya/co2"
@@ -51,3 +60,30 @@ mqtt:
       state_topic: "farm/ilya/temperature"
       value_template: "{{ value_json.weather }}"
       icon: mdi:weather-partly-cloudy
+
+  # Актуаторы. HA-автоматизации шлют ON/OFF в command_topic, эмулятор применяет эффект
+  # к модели и отвечает состоянием в state_topic (его и показывает переключатель).
+  switch:
+    - name: "Обогрев теплицы"
+      unique_id: farm_ilya_heater
+      command_topic: "farm/ilya/heater/set"
+      state_topic: "farm/ilya/heater"
+      payload_on: "ON"
+      payload_off: "OFF"
+      icon: mdi:radiator
+
+    - name: "Проветривание теплицы"
+      unique_id: farm_ilya_vent
+      command_topic: "farm/ilya/vent/set"
+      state_topic: "farm/ilya/vent"
+      payload_on: "ON"
+      payload_off: "OFF"
+      icon: mdi:fan
+
+    - name: "Досветка теплицы"
+      unique_id: farm_ilya_lamp
+      command_topic: "farm/ilya/lamp/set"
+      state_topic: "farm/ilya/lamp"
+      payload_on: "ON"
+      payload_off: "OFF"
+      icon: mdi:lightbulb

@@ -54,6 +54,18 @@ P_STAY = 0.30           # вероятность ОСТАТЬСЯ в текущ�
 HUM_RISE_TAU_H = 0.8    # влажность при дожде поднимается БЫСТРО (постоянная времени, мод.ч)
 HUM_FALL_TAU_H = 6.0    # ... и опускается МЕДЛЕННО после дождя
 
+# ---------- актуаторы (управляются из Home Assistant по MQTT) ----------
+# Логику вкл/выкл задают автоматизации Home Assistant. Эмулятор лишь применяет состояние
+# к модели и публикует его обратно. Команда: farm/ilya/<актуатор>/set (ON/OFF).
+ACTUATORS = ["heater", "vent", "lamp"]   # обогрев, проветривание, досветка
+actuators = {a: False for a in ACTUATORS}
+actuators_lock = threading.Lock()
+HEATER_DT = 5.0      # обогрев: +°C к температуре
+VENT_DT = 1.5        # проветривание: -°C к температуре
+VENT_HUM = 15.0      # проветривание: -% влажности
+VENT_CO2 = 300.0     # проветривание: -ppm CO2 (свежий воздух)
+LAMP_LUX = 12000.0   # досветка: +lux к свету ВНУТРИ (и косвенно -CO2 через фотосинтез)
+
 
 # ---------- погода ----------
 @dataclass
@@ -105,7 +117,8 @@ SENSORS = [
     SensorConfig("temperature", "°C", 21.5, 24.5, 0.25, 10.0, 35.0, 2.0),
     SensorConfig("co2", "ppm", 1450.0, 720.0, 15.0, 380.0, 1500.0, 5.0),  # 1450 темно ночью, 720 светло днем
     SensorConfig("humidity", "%", 70.0, 62.0, 1.0, 35.0, 90.0, 3.0),
-    SensorConfig("light", "lux", 8000.0, 42000.0, 1200.0, 200.0, 70000.0, 1.5),
+    SensorConfig("light", "lux", 8000.0, 42000.0, 1200.0, 200.0, 70000.0, 1.5),       # свет ВНУТРИ теплицы
+    SensorConfig("light_out", "lux", 10000.0, 55000.0, 1500.0, 0.0, 75000.0, 1.5),    # свет СНАРУЖИ (естественный)
 ]
 # Глобально менять частоту публикации (RATE_MULT из .env): 4 = в 4 раза чаще.
 if RATE_MULT and RATE_MULT != 1.0:
@@ -153,22 +166,29 @@ def weather_mults():
     return tm, lm, ha_target, name
 
 
-def baseline(cfg: SensorConfig, d: float, tm: float, lm: float, ha: float, cur: dict) -> float:
-    """Целевое значение датчика: суточный ход + погода + связи между датчиками."""
+def baseline(cfg: SensorConfig, d: float, tm: float, lm: float, ha: float, cur: dict, act: dict) -> float:
+    """Целевое значение датчика: суточный ход + погода + связи + эффект актуаторов."""
     dn = cfg.night + (cfg.day - cfg.night) * d           # суточный ход
+    heater = act.get("heater", False)
+    vent = act.get("vent", False)
+    lamp = act.get("lamp", False)
+    if cfg.name == "light_out":
+        return dn * lm                                   # свет снаружи: суточный ход * погода
     if cfg.name == "light":
-        return dn * lm                                   # погода влияет на свет
+        return dn * lm + (LAMP_LUX if lamp else 0.0)     # свет внутри + досветка (лампа)
     if cfg.name == "temperature":
         hum = cur.get("humidity", 66.0)
-        return dn * tm - 0.15 * (hum - 66.0)             # погода и влияние влажности
+        base = dn * tm - 0.15 * (hum - 66.0)             # погода и влияние влажности
+        return base + (HEATER_DT if heater else 0.0) - (VENT_DT if vent else 0.0)
     if cfg.name == "co2":
-        # CO2 зависит от УРОВНЯ освещенности (база без шума, чистое разделение погод),
-        # круто при низком свете: дождь ночью (очень темно) часто >1200; пасмурно ночью иногда;
+        # CO2 зависит от УРОВНЯ освещенности (с учетом досветки), проветривание снижает CO2.
+        # Круто при низком свете: дождь ночью (очень темно) часто >1200; пасмурно ночью иногда;
         # ясно и облачно с прояснениями никогда (светлее).
-        light_base = (8000.0 + 34000.0 * d) * lm         # база освещенности (как у датчика light) * погода
+        light_base = (8000.0 + 34000.0 * d) * lm + (LAMP_LUX if lamp else 0.0)
         ln = max(0.0, min(1.0, (light_base - 2000.0) / 15000.0))
-        return cfg.night - (cfg.night - cfg.day) * ln    # 1450 (темно) .. 720 (светло)
-    return dn + ha                                       # humidity: дождь поднимает к аномалии
+        base = cfg.night - (cfg.night - cfg.day) * ln    # 1450 (темно) .. 720 (светло)
+        return base - (VENT_CO2 if vent else 0.0)
+    return dn + ha - (VENT_HUM if vent else 0.0)         # humidity: дождь вверх, проветривание вниз
 
 
 def connect(client_id: str) -> mqtt_client.Client:
@@ -235,7 +255,9 @@ def publisher(cfg: SensorConfig):
             else:
                 with current_lock:
                     cur = dict(current)
-                base = baseline(cfg, daylight(), tm, lm, ha_tracked, cur)
+                with actuators_lock:
+                    act = dict(actuators)
+                base = baseline(cfg, daylight(), tm, lm, ha_tracked, cur, act)
                 noise += -0.3 * noise + random.gauss(0.0, cfg.sigma)
                 value = round(max(cfg.lo, min(cfg.hi, base + noise)), 2)
             with current_lock:
@@ -260,12 +282,29 @@ def publisher(cfg: SensorConfig):
 
 
 def control_listener():
-    """Слушает топик control: имя датчика - вколоть аномалию; 'clear' - сбросить."""
+    """Слушает control (инъекция аномалий) и <актуатор>/set (команды от Home Assistant)."""
     names = {s.name for s in SENSORS}
     client = connect(f"farm-{STUDENT_TAG}-control")
 
+    def publish_state(name):
+        with actuators_lock:
+            on = actuators[name]
+        client.publish(f"{TOPIC_PREFIX}/{name}", "ON" if on else "OFF", qos=1, retain=True)
+
     def on_msg(_c, _u, m):
-        cmd = m.payload.decode().strip().lower()
+        payload = m.payload.decode().strip()
+        # команда актуатору: farm/ilya/<актуатор>/set  (ON/OFF, шлет Home Assistant)
+        if m.topic.endswith("/set"):
+            name = m.topic.split("/")[-2]
+            if name in ACTUATORS:
+                on = payload.upper() in ("ON", "1", "TRUE")
+                with actuators_lock:
+                    actuators[name] = on
+                publish_state(name)
+                print(f"  [act] {name} -> {'ON' if on else 'OFF'} (команда из HA)", flush=True)
+            return
+        # инъекция аномалии: имя датчика в топик control, 'clear' - сброс
+        cmd = payload.lower()
         with force_lock:
             if cmd in ("clear", "reset"):
                 for k in force:
@@ -278,8 +317,10 @@ def control_listener():
                 print(f"  [control] не знаю команду '{cmd}' (датчики: {sorted(names)} | clear)", flush=True)
 
     client.on_message = on_msg
-    client.subscribe(f"{TOPIC_PREFIX}/control", qos=1)
-    print(f"  [control] слушаю {TOPIC_PREFIX}/control (инъекция аномалий)", flush=True)
+    client.subscribe([(f"{TOPIC_PREFIX}/control", 1), (f"{TOPIC_PREFIX}/+/set", 1)])
+    for a in ACTUATORS:          # начальные состояния (OFF), чтобы Home Assistant сразу их увидел
+        publish_state(a)
+    print(f"  [control] слушаю {TOPIC_PREFIX}/control и {TOPIC_PREFIX}/<актуатор>/set", flush=True)
     try:
         while not stop_flag.is_set():
             stop_flag.wait(1)
@@ -304,6 +345,8 @@ def main():
           flush=True)
     for s in SENSORS:
         print(f"  {s.name}: {s.topic}  каждые {s.interval} с", flush=True)
+    print(f"  актуаторы {ACTUATORS}: команда в {TOPIC_PREFIX}/<актуатор>/set, состояние в {TOPIC_PREFIX}/<актуатор>",
+          flush=True)
 
     threads = [threading.Thread(target=publisher, args=(cfg,), name=cfg.name, daemon=True)
                for cfg in SENSORS]
