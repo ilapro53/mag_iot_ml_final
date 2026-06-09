@@ -6,8 +6,10 @@
 # Запускать БЕЗ sudo (sudo нужен только для apt внутри, чтобы venv остался твоим):
 #   chmod +x 02_sensor_setup.sh
 #   ./02_sensor_setup.sh
-# Адрес брокера и режим можно переопределить при первом создании .env:
-#   BROKER_IP=192.168.2.205 DAY_PERIOD_SEC=86400 ./02_sensor_setup.sh
+# При создании .env скрипт спросит режим времени (обычный/fast). Чтобы не спрашивал:
+#   MODE=fast ./02_sensor_setup.sh        (или MODE=normal)
+#   DAY_PERIOD_SEC=37.5 RATE_MULT=4 ./02_sensor_setup.sh   (явные значения)
+# Адрес брокера: BROKER_IP=192.168.2.205 ./02_sensor_setup.sh
 
 set -e
 
@@ -17,12 +19,7 @@ MQTT_PORT="${MQTT_PORT:-1883}"
 MQTT_USER="${MQTT_USER:-mqtt_exp}"
 MQTT_PASSWORD="${MQTT_PASSWORD:-pass_mqtt}"
 TOPIC_PREFIX="${TOPIC_PREFIX:-farm/ilya}"
-# Длина модельных суток: 86400 = реальное время (24 ч), 1800 = сутки за 30 мин (для показа цикла).
-DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-86400}"
-# Частота публикации. Для гладкой суточной кривой держим плотность точек как в Docker:
-# RATE_MULT = 1800 / DAY_PERIOD_SEC. При реальном времени (86400) это 0.02 - датчики шлют
-# раз в 1-4 минуты, суточная волна выходит чистой, без мохнатого шума.
-RATE_MULT="${RATE_MULT:-0.02}"
+# DAY_PERIOD_SEC и RATE_MULT задаются ниже - через режим (normal/fast) или явно.
 
 # Папка проекта = где лежит этот скрипт (там же ждем sensor_emulator.py).
 WORKDIR="$(cd "$(dirname "$0")" && pwd)"
@@ -31,6 +28,29 @@ if [ ! -f "${WORKDIR}/sensor_emulator.py" ]; then
     echo "ОШИБКА: рядом нет sensor_emulator.py."
     echo "Скопируй его в ${WORKDIR} и запусти скрипт снова."
     exit 1
+fi
+
+# --- выбор режима времени (только если .env еще нет) ---
+# Приоритет: явные DAY_PERIOD_SEC/RATE_MULT > MODE=fast|normal > вопрос в терминале > обычный.
+# normal = реальное время (сутки = настоящие сутки), для Home Assistant.
+# fast   = сутки за ~38 секунд (пресет .env.fast), для Python-визуализатора.
+if [ ! -f "${WORKDIR}/.env" ]; then
+    if [ -z "${DAY_PERIOD_SEC:-}" ] && [ -z "${RATE_MULT:-}" ] && [ -z "${MODE:-}" ] && [ -t 0 ]; then
+        echo "Какой режим времени записать в .env?"
+        echo "  1) обычный - реальное время, сутки = настоящие сутки (для Home Assistant)"
+        echo "  2) fast    - ускоренный, сутки за ~38 секунд (для Python-визуализатора)"
+        printf "Номер [1]: "
+        read -r _ans
+        case "$_ans" in
+            2|fast|f|F) MODE=fast ;;
+            *) MODE=normal ;;
+        esac
+    fi
+    case "${MODE:-normal}" in
+        fast) DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-37.5}";  RATE_MULT="${RATE_MULT:-4}" ;;
+        *)    DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-86400}"; RATE_MULT="${RATE_MULT:-0.02}" ;;
+    esac
+    echo "  режим: ${MODE:-normal} (DAY_PERIOD_SEC=${DAY_PERIOD_SEC}, RATE_MULT=${RATE_MULT})"
 fi
 
 echo "=== 1. Системные пакеты (python3, venv, pip) ==="
@@ -52,9 +72,9 @@ MQTT_PORT=${MQTT_PORT}
 MQTT_USER=${MQTT_USER}
 MQTT_PASSWORD=${MQTT_PASSWORD}
 TOPIC_PREFIX=${TOPIC_PREFIX}
-# Длина модельных суток в секундах: 86400 = реальное время (24 ч), 1800 = сутки за 30 минут (для показа).
+# Длина модельных суток в секундах: 86400 = реальное время (24 ч), 37.5 = сутки за ~38 секунд (fast).
 DAY_PERIOD_SEC=${DAY_PERIOD_SEC}
-# Частота: для гладкой кривой держим RATE_MULT = 1800 / DAY_PERIOD_SEC (реальное время -> 0.02).
+# Частота: для гладкой кривой держим RATE_MULT = 1800 / DAY_PERIOD_SEC (реальное время -> 0.02, fast -> 4).
 RATE_MULT=${RATE_MULT}
 TZ=Europe/Moscow
 EOF
@@ -91,7 +111,7 @@ echo
 echo "==================================================="
 echo " Датчик готов. Настройки в файле .env (там же)."
 echo " Брокер: ${MQTT_HOST}:${MQTT_PORT}, топики ${TOPIC_PREFIX}/<датчик>"
-echo " Режим времени: DAY_PERIOD_SEC=${DAY_PERIOD_SEC} (86400 = реальное, 1800 = сутки за 30 мин)."
+echo " Режим времени: DAY_PERIOD_SEC=${DAY_PERIOD_SEC} (86400 = реальное, 37.5 = fast)."
 echo " Запуск (показывает консоль публикаций):"
 echo "   ./run_sensor.sh"
 echo "==================================================="

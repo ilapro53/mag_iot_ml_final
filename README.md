@@ -255,33 +255,26 @@ BROKER_IP=192.168.2.205 bash ~/farm-sensor/02_sensor_setup.sh && \
 ~/farm-sensor/run_sensor.sh
 ```
 
+При установке скрипт спросит **режим времени**:
+
+- **обычный** - реальное время, сутки = настоящие сутки, для Home Assistant (`DAY_PERIOD_SEC=86400`, `RATE_MULT=0.02`);
+- **fast** - ускоренный, сутки за ~38 секунд, пресет `.env.fast`, для Python-визуализатора (`DAY_PERIOD_SEC=37.5`, `RATE_MULT=4`).
+
 Скрипт ставит Python и `paho-mqtt` в venv, кладет настройки в `~/farm-sensor/.env`, создает
-обертку `run_sensor.sh` и запускает датчик (видно консоль публикаций). Дальше режим меняется
-правкой `.env` и перезапуском `~/farm-sensor/run_sensor.sh`:
+обертку `run_sensor.sh` и запускает датчик (видно консоль публикаций).
 
-- `DAY_PERIOD_SEC=86400` - реальное время (сутки = настоящие сутки);
-- `DAY_PERIOD_SEC=1800` - сутки за 30 минут (для показа полного цикла);
-- частоту держи по правилу `RATE_MULT = 1800 / DAY_PERIOD_SEC` (реальное время -> `0.02`),
-  тогда суточная кривая гладкая, без мохнатого шума.
-
-**Ускоренное время (пресет `.env.fast` в Docker)** - сутки за ~38 секунд
-(`DAY_PERIOD_SEC=37.5`, `RATE_MULT=4`), цикл день/ночь виден сразу. Та же вставка, но с
-заданными режимом и частотой (действует при ПЕРВОМ запуске, пока `.env` еще нет):
+**Ответить заранее (без вопроса)** - задать режим переменной `MODE`, напр. строку запуска для fast:
 
 ```bash
-mkdir -p ~/farm-sensor && \
-wget -O ~/farm-sensor/sensor_emulator.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/sensor/sensor_emulator.py && \
-wget -O ~/farm-sensor/02_sensor_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/02_sensor_setup.sh && \
-BROKER_IP=192.168.2.205 DAY_PERIOD_SEC=37.5 RATE_MULT=4 bash ~/farm-sensor/02_sensor_setup.sh && \
-~/farm-sensor/run_sensor.sh
+BROKER_IP=192.168.2.205 MODE=fast bash ~/farm-sensor/02_sensor_setup.sh
 ```
 
-Если `.env` уже создан, эти переменные не подхватятся (скрипт его не перезатирает) - тогда
-правь `~/farm-sensor/.env` (`DAY_PERIOD_SEC=37.5`, `RATE_MULT=4`) и перезапускай `~/farm-sensor/run_sensor.sh`.
+(`MODE=normal` - обычный режим; можно и точные значения `DAY_PERIOD_SEC=... RATE_MULT=...`.)
 
-Этот режим хорош для Python-визуализатора (своя модельная ось времени). В Home Assistant ось
-реальная, поэтому при такой скорости сутки сильно сжимаются - для HA лучше реальное время или
-`DAY_PERIOD_SEC=1800`.
+Дальше режим меняется правкой `~/farm-sensor/.env` и перезапуском `~/farm-sensor/run_sensor.sh`.
+Частоту держи по правилу `RATE_MULT = 1800 / DAY_PERIOD_SEC` (реальное время -> `0.02`, fast -> `4`),
+тогда суточная кривая гладкая. Для Home Assistant лучше реальное время или `DAY_PERIOD_SEC=1800`
+(ось HA реальная, при fast сутки сильно сжимаются).
 
 ### 3. Home Assistant
 
