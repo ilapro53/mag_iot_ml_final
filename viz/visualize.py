@@ -24,6 +24,7 @@ import json
 import os
 import threading
 import time
+import warnings
 from collections import deque
 
 from paho.mqtt import client as mqtt_client
@@ -87,14 +88,24 @@ def main():
     import matplotlib
     if args.save:
         matplotlib.use("Agg")          # без окна, только файл
-    # эмодзи-шрифт добавляем ТОЛЬКО если он есть в системе (иначе matplotlib сыпет findfont-варнинги).
-    # Windows: Segoe UI Emoji; Ubuntu: Noto Color Emoji / Noto Emoji / Symbola (если установлены).
+    # Эмодзи-шрифт - запасной для значков погоды. Свежеустановленный на Ubuntu Symbola/Noto
+    # может не попасть в кеш font_manager, поэтому подхватываем файлы с диска напрямую.
+    import glob
     import matplotlib.font_manager as fm
+    for _patt in ("/usr/share/fonts/**/Symbola*.[ot]tf", "/usr/share/fonts/**/NotoEmoji-*.[ot]tf"):
+        for _path in glob.glob(_patt, recursive=True):
+            try:
+                fm.fontManager.addfont(_path)
+            except Exception:
+                pass
     _avail = {f.name for f in fm.fontManager.ttflist}
-    _emoji = [f for f in ("Segoe UI Emoji", "Noto Color Emoji", "Noto Emoji", "Symbola", "Segoe UI Symbol")
+    _emoji = [f for f in ("Symbola", "Noto Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol")
               if f in _avail]
     matplotlib.rcParams["font.family"] = ["DejaVu Sans", *_emoji]
     matplotlib.rcParams["hatch.linewidth"] = 1.3   # штриховка полос актуаторов почетче
+    # глушим остаточный спам: отсутствующий глиф эмодзи и tight_layout с кнопками
+    warnings.filterwarnings("ignore", message=r"Glyph \d+")
+    warnings.filterwarnings("ignore", message=".*not compatible with tight_layout.*")
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
     from matplotlib.lines import Line2D
@@ -105,6 +116,7 @@ def main():
     act_events = {a: deque(maxlen=args.maxlen) for a in ACTUATORS}  # (ts, вкл?) события актуаторов
     anomaly_total = {s: 0 for s in SENSORS}                     # счетчик аномалий с начала запуска
     weather_now = {"name": ""}                                  # последняя известная погода
+    button_map = {}                                             # кнопки-переключатели актуаторов (live-режим)
 
     def on_message(_c, _u, msg):
         leaf = msg.topic.split("/")[-1]
@@ -151,6 +163,10 @@ def main():
             snap_out = list(light_out_buf)
             act_snap = {a: list(act_events[a]) for a in ACTUATORS}
             total = dict(anomaly_total)
+        # цвет кнопок по текущему состоянию актуатора (включен - цветная, выключен - серая)
+        for _name, _btn in button_map.items():
+            _on = act_snap[_name][-1][1] if act_snap[_name] else False
+            _btn.ax.set_facecolor(ACT_COLOR[_name] if _on else "0.9")
         all_pts = [p for s in SENSORS for p in snap[s]] + snap_out
         have = bool(all_pts)
         if have:
@@ -273,9 +289,26 @@ def main():
         wtxt = f"   |   Погода: {weather_now['name']}" if weather_now["name"] else ""
         fig.suptitle(f"IoT-ферма (MQTT): зеленая зона — норма, красные точки — аномалии, "
                      f"полосы — работа актуаторов{wtxt}", fontsize=11)
-        fig.tight_layout(rect=[0, 0, 1, 0.96])
+        fig.tight_layout(rect=[0, 0.07, 1, 0.96])   # нижняя полоса оставлена под кнопки
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 8))
+
+    def make_toggle(name):
+        """Клик по кнопке: публикует противоположное состояние актуатора в .../set."""
+        def _cb(_event):
+            with lock:
+                evs = list(act_events[name])
+            on = evs[-1][1] if evs else False
+            client.publish(f"{args.prefix}/{name}/set", "OFF" if on else "ON", qos=1)
+        return _cb
+
+    if not args.save:                       # кнопки-переключатели актуаторов внизу окна
+        from matplotlib.widgets import Button
+        for i, name in enumerate(ACTUATORS):
+            bax = fig.add_axes([0.30 + i * 0.15, 0.005, 0.13, 0.05])
+            btn = Button(bax, ACT_TITLE[name].capitalize())
+            btn.on_clicked(make_toggle(name))
+            button_map[name] = btn
 
     if args.save:
         print(f"Сбор данных {args.duration} с ...")
