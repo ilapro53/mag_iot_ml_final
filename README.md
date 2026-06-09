@@ -293,3 +293,31 @@ BROKER_IP=192.168.2.205 DAY_PERIOD_SEC=37.5 RATE_MULT=4 bash ~/farm-sensor/02_se
 
 > Внимание: для ВМ Home Assistant не используй "Сохранить состояние" - при возобновлении
 > прыгают часы и ломается история. Выключай ВМ штатно или оставляй запущенной.
+
+### 4. Python-визуализатор (опционально, второй способ показа)
+
+`visualize.py` - 4 живых графика matplotlib с подсветкой аномалий, второй способ визуализации
+помимо Home Assistant. Ставится на **брокер-ВМ** (там брокер - это localhost, и есть рабочий
+стол для окна). Одной вставкой - скачать, настроить и запустить окно:
+
+```bash
+mkdir -p ~/farm-viz && \
+wget -O ~/farm-viz/visualize.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/viz/visualize.py && \
+wget -O ~/farm-viz/03_viz_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/03_viz_setup.sh && \
+bash ~/farm-viz/03_viz_setup.sh && \
+~/farm-viz/run_viz.sh
+```
+
+Скрипт ставит `paho-mqtt` и `matplotlib` в venv, кладет обертку `run_viz.sh` (адрес брокера
+`localhost:1883` зашит) и открывает окно с 4 графиками. Окну нужен **рабочий стол ВМ** - запускай
+в графической сессии, не по SSH без X.
+
+Полезные флаги (передаются дальше через обертку):
+
+```bash
+~/farm-viz/run_viz.sh --window 24                    # окно поуже по времени (часы модельного времени)
+~/farm-viz/run_viz.sh --save ~/farm-viz/graphs.png --duration 60   # сохранить PNG без окна (для портала)
+```
+
+Если визуализатор на отдельной ВМ (не на брокере) - укажи IP брокера при установке:
+`BROKER_IP=192.168.2.205 bash ~/farm-viz/03_viz_setup.sh`.
