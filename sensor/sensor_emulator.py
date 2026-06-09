@@ -63,8 +63,8 @@ actuators_lock = threading.Lock()
 HEATER_DT = 5.0      # обогрев: +°C к температуре (нарастает плавно)
 VENT_DT = 1.2        # проветривание: -°C к температуре (плавно)
 VENT_HUM = 10.0      # проветривание: -% влажности (плавно)
-VENT_CO2 = 250.0     # проветривание: -ppm CO2, свежий воздух (плавно)
-LAMP_CO2 = 700.0     # досветка: -ppm CO2 от фотосинтеза, ПЛАВНО как влажность (сам свет лампы - мгновенно)
+VENT_CO2_TARGET = 800.0  # проветривание: тянет CO2 К НОРМЕ (свежий воздух, хоть сверху, хоть снизу), плавно
+LAMP_CO2 = 700.0     # досветка: -ppm CO2 от фотосинтеза, плавно (когда не проветриваем; иначе вентиляция доминирует)
 LAMP_LEVEL = 22000.0   # досветка: держит МИНИМУМ света внутри (пол через max); свет - МГНОВЕННО
 ACT_EFF_TAU_H = 3.0  # постоянная времени плавного набора/спада эффекта обогрева и проветривания (мод.ч)
                      # (больше = плавнее; на ускоренном времени важно, чтобы tau > шага модельного времени за тик)
@@ -169,9 +169,9 @@ def weather_mults():
     return tm, lm, ha_target, name
 
 
-def act_delta(cfg: SensorConfig, act: dict) -> float:
-    """Целевая добавка от актуаторов, набирается в publisher ПЛАВНО (накопительно).
-    Свет от лампы мгновенный (в baseline), а CO2-эффект фотосинтеза от лампы - плавный (здесь)."""
+def act_delta(cfg: SensorConfig, act: dict, base: float) -> float:
+    """Целевая добавка от актуаторов, набирается в publisher ПЛАВНО (накопительно). base - текущее
+    естественное значение (нужно CO2: проветривание тянет к норме, а не вычитает фиксированное)."""
     heater = act.get("heater", False)
     vent = act.get("vent", False)
     lamp = act.get("lamp", False)
@@ -180,7 +180,9 @@ def act_delta(cfg: SensorConfig, act: dict) -> float:
     if cfg.name == "humidity":
         return -(VENT_HUM if vent else 0.0)
     if cfg.name == "co2":
-        return -(VENT_CO2 if vent else 0.0) - (LAMP_CO2 if lamp else 0.0)
+        if vent:
+            return VENT_CO2_TARGET - base      # проветривание тянет к норме и доминирует над лампой
+        return -(LAMP_CO2 if lamp else 0.0)    # фотосинтез снижает CO2 (когда не проветриваем)
     return 0.0
 
 
@@ -260,12 +262,15 @@ def publisher(cfg: SensorConfig):
             dt_h = cfg.interval / DAY_PERIOD_SEC * 24.0
             with actuators_lock:
                 act = dict(actuators)
-            # плавный (накопительный) эффект обогрева/проветривания - набирается и спадает постепенно
-            act_eff += (act_delta(cfg, act) - act_eff) * min(1.0, dt_h / ACT_EFF_TAU_H)
+            with current_lock:
+                cur = dict(current)
             if cfg.name == "humidity":
                 # влажность: быстрый подъем при дожде, медленный спад после
                 tau = HUM_RISE_TAU_H if ha_target > ha_tracked else HUM_FALL_TAU_H
                 ha_tracked += (ha_target - ha_tracked) * min(1.0, dt_h / tau)
+            base = baseline(cfg, daylight(), tm, lm, ha_tracked, cur, act)
+            # плавный (накопительный) эффект актуаторов; для CO2 проветривание тянет к норме (нужен base)
+            act_eff += (act_delta(cfg, act, base) - act_eff) * min(1.0, dt_h / ACT_EFF_TAU_H)
             with force_lock:
                 forced = force[cfg.name] > 0
                 if forced:
@@ -273,9 +278,6 @@ def publisher(cfg: SensorConfig):
             if forced:
                 value = round(cfg.lo + (cfg.hi - cfg.lo) * 0.90, 2)   # аномалия: высоко, но видна на графике
             else:
-                with current_lock:
-                    cur = dict(current)
-                base = baseline(cfg, daylight(), tm, lm, ha_tracked, cur, act)
                 noise += -0.3 * noise + random.gauss(0.0, cfg.sigma)
                 value = round(max(cfg.lo, min(cfg.hi, base + act_eff + noise)), 2)
             with current_lock:
