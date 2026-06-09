@@ -1,0 +1,115 @@
+# Автоматизации Home Assistant для тепличной фермы (логика актуаторов).
+#
+# Как применить (любой способ):
+#   A) File editor: открыть /config/automations.yaml и вставить эти элементы списка.
+#   B) Настройки -> Автоматизации -> создать -> меню (три точки) -> "Редактировать в YAML"
+#      -> вставить ОДИН элемент (без верхнего "-").
+# После добавления: Инструменты разработчика -> YAML -> Перезагрузить автоматизации.
+#
+# entity_id могут отличаться (HA транслитерирует имена) - проверь в Состояниях и поправь.
+# Пороги с гистерезисом (вкл при одном значении, выкл при другом), чтобы актуаторы не дребезжали.
+
+# --- Обогрев: держим температуру 18..22 ---
+- alias: "Теплица: обогрев вкл"
+  description: "Холодно - включить обогрев"
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.temperatura_teplitsy
+      below: 18
+  conditions: []
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.obogrev_teplitsy
+
+- alias: "Теплица: обогрев выкл"
+  description: "Прогрелось - выключить обогрев"
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.temperatura_teplitsy
+      above: 22
+  conditions: []
+  actions:
+    - action: switch.turn_off
+      target:
+        entity_id: switch.obogrev_teplitsy
+
+# --- Проветривание: при высокой влажности, CO2 или жаре; выкл когда все успокоилось ---
+- alias: "Теплица: проветривание вкл"
+  description: "Душно (влажность/CO2/жара) - проветрить"
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.vlazhnost_teplitsy
+      above: 80
+    - trigger: numeric_state
+      entity_id: sensor.co2_teplitsy
+      above: 1200
+    - trigger: numeric_state
+      entity_id: sensor.temperatura_teplitsy
+      above: 28
+  conditions: []
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.provetrivanie_teplitsy
+
+- alias: "Теплица: проветривание выкл"
+  description: "Влажность, CO2 и температура в норме - закрыть"
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.vlazhnost_teplitsy
+      below: 70
+    - trigger: numeric_state
+      entity_id: sensor.co2_teplitsy
+      below: 1000
+    - trigger: numeric_state
+      entity_id: sensor.temperatura_teplitsy
+      below: 26
+  conditions:
+    - condition: numeric_state
+      entity_id: sensor.vlazhnost_teplitsy
+      below: 70
+    - condition: numeric_state
+      entity_id: sensor.co2_teplitsy
+      below: 1000
+    - condition: numeric_state
+      entity_id: sensor.temperatura_teplitsy
+      below: 26
+  actions:
+    - action: switch.turn_off
+      target:
+        entity_id: switch.provetrivanie_teplitsy
+
+# --- Досветка: внутри темно И снаружи света не хватает; выкл когда снаружи светло ---
+- alias: "Теплица: досветка вкл"
+  description: "Темно внутри и снаружи мало света - включить лампу"
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.osveshchennost_teplitsy
+      below: 6000
+  conditions:
+    - condition: numeric_state
+      entity_id: sensor.osveshchennost_snaruzhi
+      below: 9000
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.dosvetka_teplitsy
+
+- alias: "Теплица: досветка выкл"
+  description: "Снаружи стало светло - выключить лампу"
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.osveshchennost_snaruzhi
+      above: 14000
+  conditions: []
+  actions:
+    - action: switch.turn_off
+      target:
+        entity_id: switch.dosvetka_teplitsy
