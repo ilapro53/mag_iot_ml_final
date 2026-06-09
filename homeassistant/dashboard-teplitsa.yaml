@@ -104,6 +104,7 @@ views:
           - type: heading
             heading: История за день
           - type: history-graph
+            title: Температура
             entities:
               - entity: sensor.temperatura_teplitsy
             hours_to_show: 24
@@ -111,6 +112,7 @@ views:
               columns: 24
               rows: 4
           - type: history-graph
+            title: Влажность
             entities:
               - entity: sensor.vlazhnost_teplitsy
             hours_to_show: 24
@@ -127,6 +129,7 @@ views:
               columns: 24
               rows: 4
           - type: history-graph
+            title: CO2
             entities:
               - entity: sensor.co2_teplitsy
             hours_to_show: 24
