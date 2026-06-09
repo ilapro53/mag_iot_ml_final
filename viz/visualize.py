@@ -109,6 +109,8 @@ def main():
             with lock:
                 act_events[leaf].append((now, text.strip().upper() in ("ON", "1", "TRUE")))
             return
+        if leaf == "control" or msg.topic.endswith("/set"):
+            return                                 # команды, не данные - пропускаем
         try:
             data = json.loads(text)
             name = data.get("sensor") or leaf
