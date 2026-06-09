@@ -60,6 +60,8 @@ ACT_COLOR = {"heater": "#FF7043", "vent": "#42A5F5", "lamp": "#FFD54F"}
 ACT_TITLE = {"heater": "обогрев", "vent": "проветривание", "lamp": "досветка"}
 ACT_ALPHA = 0.30
 LIGHT_OUT_COLOR = "#8B6914"   # свет снаружи - вторая линия на графике освещенности
+# Кнопки погоды (для демо): подпись и индекс состояния в эмуляторе (WEATHER: 0 облачно, 1 пасмурно, 2 дождь, 5 ясно).
+WEATHER_BTN = [("Ясно", 5), ("Облачно", 0), ("Пасмурно", 1), ("Дождь", 2)]
 
 
 def _hhmm(h):
@@ -117,6 +119,7 @@ def main():
     anomaly_total = {s: 0 for s in SENSORS}                     # счетчик аномалий с начала запуска
     weather_now = {"name": ""}                                  # последняя известная погода
     button_map = {}                                             # кнопки-переключатели актуаторов (live-режим)
+    weather_buttons = []                                        # кнопки погоды (держим ссылки, чтобы не удалились)
 
     def on_message(_c, _u, msg):
         leaf = msg.topic.split("/")[-1]
@@ -289,7 +292,7 @@ def main():
         wtxt = f"   |   Погода: {weather_now['name']}" if weather_now["name"] else ""
         fig.suptitle(f"IoT-ферма (MQTT): зеленая зона — норма, красные точки — аномалии, "
                      f"полосы — работа актуаторов{wtxt}", fontsize=11)
-        fig.tight_layout(rect=[0, 0.07, 1, 0.96])   # нижняя полоса оставлена под кнопки
+        fig.tight_layout(rect=[0, 0.14, 1, 0.96])   # нижняя полоса под два ряда кнопок (погода + актуаторы)
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 8))
 
@@ -302,13 +305,24 @@ def main():
             client.publish(f"{args.prefix}/{name}/set", "OFF" if on else "ON", qos=1)
         return _cb
 
-    if not args.save:                       # кнопки-переключатели актуаторов внизу окна
+    def make_weather(idx):
+        """Клик по кнопке погоды: публикует индекс состояния в weather/set."""
+        def _cb(_event):
+            client.publish(f"{args.prefix}/weather/set", str(idx), qos=1)
+        return _cb
+
+    if not args.save:                       # кнопки внизу: погода (верхний ряд) и актуаторы (нижний ряд)
         from matplotlib.widgets import Button
         for i, name in enumerate(ACTUATORS):
             bax = fig.add_axes([0.30 + i * 0.15, 0.005, 0.13, 0.05])
             btn = Button(bax, ACT_TITLE[name].capitalize())
             btn.on_clicked(make_toggle(name))
             button_map[name] = btn
+        for i, (lab, idx) in enumerate(WEATHER_BTN):
+            wax = fig.add_axes([0.17 + i * 0.16, 0.065, 0.14, 0.05])
+            wb = Button(wax, lab)
+            wb.on_clicked(make_weather(idx))
+            weather_buttons.append(wb)
 
     if args.save:
         print(f"Сбор данных {args.duration} с ...")

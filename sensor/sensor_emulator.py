@@ -325,6 +325,17 @@ def control_listener():
                     actuators[name] = on
                 publish_state(name)
                 print(f"  [act] {name} -> {'ON' if on else 'OFF'} (команда из HA)", flush=True)
+            elif name == "weather":
+                # ручная установка погоды по индексу (кнопки в визуализаторе), с плавным переходом
+                try:
+                    idx = int(payload) % len(WEATHER)
+                    with weather_lock:
+                        weather_state["prev"] = weather_state["cur"]
+                        weather_state["cur"] = idx
+                        weather_state["ts"] = time.time()
+                    print(f"  [weather] задана вручную: {WEATHER[idx].name}", flush=True)
+                except ValueError:
+                    pass
             return
         # инъекция аномалии: имя датчика в топик control, 'clear' - сброс
         cmd = payload.lower()
