@@ -27,26 +27,24 @@ if [ ! -f "${WORKDIR}/sensor_emulator.py" ]; then
     exit 1
 fi
 
-# --- выбор режима времени (только если .env еще нет) ---
+# --- выбор режима времени (спрашиваем при КАЖДОЙ установке) ---
 # Приоритет: явные DAY_PERIOD_SEC/RATE_MULT > MODE=fast|normal > вопрос в терминале > обычный.
-if [ ! -f "${WORKDIR}/.env" ]; then
-    if [ -z "${DAY_PERIOD_SEC:-}" ] && [ -z "${RATE_MULT:-}" ] && [ -z "${MODE:-}" ] && [ -t 0 ]; then
-        echo "Какой режим времени записать в .env?"
-        echo "  1) обычный - реальное время, сутки = настоящие сутки (для Home Assistant)"
-        echo "  2) fast    - ускоренный, сутки за ~38 секунд (для Python-визуализатора)"
-        printf "Номер [1]: "
-        read -r _ans
-        case "$_ans" in
-            2|fast|f|F) MODE=fast ;;
-            *) MODE=normal ;;
-        esac
-    fi
-    case "${MODE:-normal}" in
-        fast) DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-37.5}";  RATE_MULT="${RATE_MULT:-4}" ;;
-        *)    DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-86400}"; RATE_MULT="${RATE_MULT:-0.02}" ;;
+if [ -z "${DAY_PERIOD_SEC:-}" ] && [ -z "${RATE_MULT:-}" ] && [ -z "${MODE:-}" ] && [ -t 0 ]; then
+    echo "Какой режим времени записать в .env?"
+    echo "  1) обычный - реальное время, сутки = настоящие сутки (для Home Assistant)"
+    echo "  2) fast    - ускоренный, сутки за ~38 секунд (для Python-визуализатора)"
+    printf "Номер [1]: "
+    read -r _ans
+    case "$_ans" in
+        2|fast|f|F) MODE=fast ;;
+        *) MODE=normal ;;
     esac
-    echo "  режим: ${MODE:-normal} (DAY_PERIOD_SEC=${DAY_PERIOD_SEC}, RATE_MULT=${RATE_MULT})"
 fi
+case "${MODE:-normal}" in
+    fast) DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-37.5}";  RATE_MULT="${RATE_MULT:-4}" ;;
+    *)    DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-86400}"; RATE_MULT="${RATE_MULT:-0.02}" ;;
+esac
+echo "  режим: ${MODE:-normal} (DAY_PERIOD_SEC=${DAY_PERIOD_SEC}, RATE_MULT=${RATE_MULT})"
 
 echo "=== 1. Установка uv (если еще нет) ==="
 if ! command -v uv >/dev/null 2>&1 && [ ! -x "${HOME}/.local/bin/uv" ]; then
@@ -55,10 +53,10 @@ fi
 export PATH="${HOME}/.local/bin:${PATH}"
 uv --version
 
-echo "=== 2. Конфиг .env (создается, только если его еще нет) ==="
-# .env - единый источник настроек, как в Docker-варианте. Правь его и перезапускай ./run_sensor.sh.
-if [ ! -f "${WORKDIR}/.env" ]; then
-    cat > "${WORKDIR}/.env" <<EOF
+echo "=== 2. Конфиг .env (перезаписывается при каждой установке) ==="
+# .env - единый источник настроек. Между установками режим можно менять и тут вручную,
+# затем перезапуск ./run_sensor.sh. Но повторный запуск этого скрипта перезапишет .env.
+cat > "${WORKDIR}/.env" <<EOF
 # Конфиг датчика-эмулятора. Меняй значения и перезапускай ./run_sensor.sh.
 MQTT_HOST=${BROKER_IP}
 MQTT_PORT=${MQTT_PORT}
@@ -71,10 +69,7 @@ DAY_PERIOD_SEC=${DAY_PERIOD_SEC}
 RATE_MULT=${RATE_MULT}
 TZ=Europe/Moscow
 EOF
-    echo "  создан ${WORKDIR}/.env"
-else
-    echo "  .env уже есть, не трогаю (правь вручную при необходимости)"
-fi
+echo "  записан ${WORKDIR}/.env (режим ${MODE:-normal})"
 
 echo "=== 3. Обертка запуска run_sensor.sh (uv run, читает .env) ==="
 cat > "${WORKDIR}/run_sensor.sh" <<'EOF'
