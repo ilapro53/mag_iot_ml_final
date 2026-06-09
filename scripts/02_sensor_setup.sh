@@ -32,7 +32,7 @@ fi
 if [ -z "${DAY_PERIOD_SEC:-}" ] && [ -z "${RATE_MULT:-}" ] && [ -z "${MODE:-}" ] && [ -t 0 ]; then
     echo "Какой режим времени записать в .env?"
     echo "  1) обычный - реальное время, сутки = настоящие сутки (для Home Assistant)"
-    echo "  2) fast    - ускоренный, сутки за ~9 секунд (для Python-визуализатора)"
+    echo "  2) fast    - ускоренный, сутки за ~38 секунд (для Python-визуализатора)"
     printf "Номер [1]: "
     read -r _ans
     case "$_ans" in
@@ -41,7 +41,7 @@ if [ -z "${DAY_PERIOD_SEC:-}" ] && [ -z "${RATE_MULT:-}" ] && [ -z "${MODE:-}" ]
     esac
 fi
 case "${MODE:-normal}" in
-    fast) DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-9.375}"; RATE_MULT="${RATE_MULT:-16}" ;;
+    fast) DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-37.5}";  RATE_MULT="${RATE_MULT:-4}" ;;
     *)    DAY_PERIOD_SEC="${DAY_PERIOD_SEC:-86400}"; RATE_MULT="${RATE_MULT:-0.02}" ;;
 esac
 echo "  режим: ${MODE:-normal} (DAY_PERIOD_SEC=${DAY_PERIOD_SEC}, RATE_MULT=${RATE_MULT})"
@@ -63,9 +63,9 @@ MQTT_PORT=${MQTT_PORT}
 MQTT_USER=${MQTT_USER}
 MQTT_PASSWORD=${MQTT_PASSWORD}
 TOPIC_PREFIX=${TOPIC_PREFIX}
-# Длина модельных суток в секундах: 86400 = реальное время (24 ч), 9.375 = сутки за ~9 секунд (fast).
+# Длина модельных суток в секундах: 86400 = реальное время (24 ч), 37.5 = сутки за ~38 секунд (fast).
 DAY_PERIOD_SEC=${DAY_PERIOD_SEC}
-# Частота публикаций: реальное время -> 0.02 (гладко по правилу 1800/DAY_PERIOD), fast -> 16.
+# Частота публикаций: реальное время -> 0.02 (гладко по правилу 1800/DAY_PERIOD), fast -> 4.
 RATE_MULT=${RATE_MULT}
 TZ=Europe/Moscow
 EOF
@@ -100,7 +100,7 @@ echo
 echo "==================================================="
 echo " Датчик готов (через uv, без venv и sudo). Настройки в файле .env (там же)."
 echo " Брокер: ${MQTT_HOST}:${MQTT_PORT}, топики ${TOPIC_PREFIX}/<датчик>"
-echo " Режим времени: DAY_PERIOD_SEC=${DAY_PERIOD_SEC} (86400 = реальное, 9.375 = fast)."
+echo " Режим времени: DAY_PERIOD_SEC=${DAY_PERIOD_SEC} (86400 = реальное, 37.5 = fast)."
 echo " Запуск (показывает консоль публикаций):"
 echo "   ./run_sensor.sh"
 echo "==================================================="

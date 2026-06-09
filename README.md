@@ -124,7 +124,7 @@ docker compose logs -f <сервис># смотреть логи: mosquitto | se
 
 | Пресет | DAY_PERIOD | Для чего |
 |--------|-----------|----------|
-| `.env.fast` | 9.375 c (сутки за ~9 с) | Python-графики, циклы видно сразу |
+| `.env.fast` | 37.5 c (сутки за ~38 с) | Python-графики, циклы видно сразу |
 | `.env.realtime` | 1800 c (сутки за 30 мин) | Home Assistant, плавный суточный ход в реальном времени |
 
 ```powershell
@@ -261,7 +261,7 @@ BROKER_IP=192.168.2.205 bash ~/farm-sensor/02_sensor_setup.sh && \
 При установке скрипт спросит **режим времени**:
 
 - **обычный** - реальное время, сутки = настоящие сутки, для Home Assistant (`DAY_PERIOD_SEC=86400`, `RATE_MULT=0.02`);
-- **fast** - ускоренный, сутки за ~9 секунд, пресет `.env.fast`, для Python-визуализатора (`DAY_PERIOD_SEC=9.375`, `RATE_MULT=16`).
+- **fast** - ускоренный, сутки за ~38 секунд, пресет `.env.fast`, для Python-визуализатора (`DAY_PERIOD_SEC=37.5`, `RATE_MULT=4`).
 
 Скрипт ставит `uv` (он приносит Python и `paho-mqtt` из PEP 723-метаданных эмулятора), кладет
 настройки в `~/farm-sensor/.env`, создает обертку `run_sensor.sh` и запускает датчик (видно
@@ -276,7 +276,7 @@ BROKER_IP=192.168.2.205 MODE=fast bash ~/farm-sensor/02_sensor_setup.sh
 (`MODE=normal` - обычный режим; можно и точные значения `DAY_PERIOD_SEC=... RATE_MULT=...`.)
 
 Дальше режим меняется правкой `~/farm-sensor/.env` и перезапуском `~/farm-sensor/run_sensor.sh`.
-Частоту держи по правилу `RATE_MULT = 1800 / DAY_PERIOD_SEC` (реальное время -> `0.02`, fast -> `16`),
+Частоту держи по правилу `RATE_MULT = 1800 / DAY_PERIOD_SEC` (реальное время -> `0.02`, fast -> `4`),
 тогда суточная кривая гладкая. Для Home Assistant лучше реальное время или `DAY_PERIOD_SEC=1800`
 (ось HA реальная, при fast сутки сильно сжимаются).
 
