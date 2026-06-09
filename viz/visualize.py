@@ -89,6 +89,7 @@ def main():
         matplotlib.use("Agg")          # без окна, только файл
     # шрифт с запасными для эмодзи погоды (на Windows есть Segoe UI Emoji/Symbol)
     matplotlib.rcParams["font.family"] = ["DejaVu Sans", "Segoe UI Emoji", "Segoe UI Symbol"]
+    matplotlib.rcParams["hatch.linewidth"] = 1.3   # штриховка полос актуаторов почетче
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
     from matplotlib.lines import Line2D
@@ -222,7 +223,8 @@ def main():
                         x0 = max(ts_to_simh(t_on), h_start)
                         x1 = max(ts_to_simh(t_off), h_start)
                         if x1 > x0:
-                            ax.axvspan(x0, x1, facecolor=ACT_COLOR[a], alpha=ACT_ALPHA, zorder=1)
+                            ax.axvspan(x0, x1, facecolor="none", edgecolor=ACT_COLOR[a],
+                                       hatch="///", linewidth=0.0, alpha=0.85, zorder=1)
                 pts = [p for p in snap[s] if simh[id(p)] >= h_start]
                 if pts:
                     xs = [simh[id(p)] for p in pts]     # x = модельные часы (монотонно)
@@ -252,7 +254,8 @@ def main():
                     handles.append(Line2D([0], [0], color=LIGHT_OUT_COLOR, lw=1.4, ls="--", label="снаружи"))
                 for a in ACTUATORS:
                     if ACT_AXIS[a] == s:
-                        handles.append(mpatches.Patch(facecolor=ACT_COLOR[a], alpha=ACT_ALPHA, label=ACT_TITLE[a]))
+                        handles.append(mpatches.Patch(facecolor="none", edgecolor=ACT_COLOR[a],
+                                                      hatch="///", label=ACT_TITLE[a]))
                 if handles:
                     ax.legend(handles=handles, loc="upper left", fontsize=7, framealpha=0.7)
                 ax.set_xticks(tick_h)
