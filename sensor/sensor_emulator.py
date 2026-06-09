@@ -64,7 +64,8 @@ HEATER_DT = 5.0      # обогрев: +°C к температуре (нара�
 VENT_DT = 1.2        # проветривание: -°C к температуре (плавно)
 VENT_HUM = 10.0      # проветривание: -% влажности (плавно)
 VENT_CO2 = 250.0     # проветривание: -ppm CO2, свежий воздух (плавно)
-LAMP_LEVEL = 22000.0   # досветка: держит МИНИМУМ света внутри (пол через max); МГНОВЕННО. -CO2 через фотосинтез
+LAMP_CO2 = 700.0     # досветка: -ppm CO2 от фотосинтеза, ПЛАВНО как влажность (сам свет лампы - мгновенно)
+LAMP_LEVEL = 22000.0   # досветка: держит МИНИМУМ света внутри (пол через max); свет - МГНОВЕННО
 ACT_EFF_TAU_H = 3.0  # постоянная времени плавного набора/спада эффекта обогрева и проветривания (мод.ч)
                      # (больше = плавнее; на ускоренном времени важно, чтобы tau > шага модельного времени за тик)
 
@@ -169,16 +170,17 @@ def weather_mults():
 
 
 def act_delta(cfg: SensorConfig, act: dict) -> float:
-    """Целевая добавка от обогрева/проветривания (в publisher набирается ПЛАВНО, накопительно).
-    Досветка сюда НЕ входит - ее эффект на свет и CO2 мгновенный (в baseline)."""
+    """Целевая добавка от актуаторов, набирается в publisher ПЛАВНО (накопительно).
+    Свет от лампы мгновенный (в baseline), а CO2-эффект фотосинтеза от лампы - плавный (здесь)."""
     heater = act.get("heater", False)
     vent = act.get("vent", False)
+    lamp = act.get("lamp", False)
     if cfg.name == "temperature":
         return (HEATER_DT if heater else 0.0) - (VENT_DT if vent else 0.0)
     if cfg.name == "humidity":
         return -(VENT_HUM if vent else 0.0)
     if cfg.name == "co2":
-        return -(VENT_CO2 if vent else 0.0)
+        return -(VENT_CO2 if vent else 0.0) - (LAMP_CO2 if lamp else 0.0)
     return 0.0
 
 
@@ -196,10 +198,9 @@ def baseline(cfg: SensorConfig, d: float, tm: float, lm: float, ha: float, cur: 
         hum = cur.get("humidity", 66.0)
         return dn * tm - 0.15 * (hum - 66.0)             # погода и влажность; обогрев/проветривание - в publisher
     if cfg.name == "co2":
-        # CO2 зависит от УРОВНЯ освещенности (с учетом досветки - мгновенно). Проветривание (плавно) - в publisher.
+        # CO2 зависит от естественной освещенности и погоды (днем низкий, ночью высокий).
+        # Эффект досветки и проветривания на CO2 - ПЛАВНЫЙ (как влажность), добавляется в publisher.
         light_base = (8000.0 + 34000.0 * d) * lm
-        if lamp:
-            light_base = max(light_base, LAMP_LEVEL)     # досветка держит пол и для фотосинтеза
         ln = max(0.0, min(1.0, (light_base - 2000.0) / 15000.0))
         return cfg.night - (cfg.night - cfg.day) * ln    # 1450 (темно) .. 720 (светло)
     return dn + ha                                       # humidity: дождь вверх; проветривание - в publisher
