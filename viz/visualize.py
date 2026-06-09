@@ -87,8 +87,13 @@ def main():
     import matplotlib
     if args.save:
         matplotlib.use("Agg")          # без окна, только файл
-    # шрифт с запасными для эмодзи погоды (на Windows есть Segoe UI Emoji/Symbol)
-    matplotlib.rcParams["font.family"] = ["DejaVu Sans", "Segoe UI Emoji", "Segoe UI Symbol"]
+    # эмодзи-шрифт добавляем ТОЛЬКО если он есть в системе (иначе matplotlib сыпет findfont-варнинги).
+    # Windows: Segoe UI Emoji; Ubuntu: Noto Color Emoji / Noto Emoji / Symbola (если установлены).
+    import matplotlib.font_manager as fm
+    _avail = {f.name for f in fm.fontManager.ttflist}
+    _emoji = [f for f in ("Segoe UI Emoji", "Noto Color Emoji", "Noto Emoji", "Symbola", "Segoe UI Symbol")
+              if f in _avail]
+    matplotlib.rcParams["font.family"] = ["DejaVu Sans", *_emoji]
     matplotlib.rcParams["hatch.linewidth"] = 1.3   # штриховка полос актуаторов почетче
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
