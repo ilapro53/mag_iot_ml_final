@@ -60,11 +60,12 @@ HUM_FALL_TAU_H = 6.0    # ... и опускается МЕДЛЕННО посл�
 ACTUATORS = ["heater", "vent", "lamp"]   # обогрев, проветривание, досветка
 actuators = {a: False for a in ACTUATORS}
 actuators_lock = threading.Lock()
-HEATER_DT = 5.0      # обогрев: +°C к температуре
-VENT_DT = 1.5        # проветривание: -°C к температуре
-VENT_HUM = 15.0      # проветривание: -% влажности
-VENT_CO2 = 300.0     # проветривание: -ppm CO2 (свежий воздух)
-LAMP_LEVEL = 22000.0   # досветка: держит МИНИМУМ света внутри (пол через max, не прибавка); -CO2 через фотосинтез
+HEATER_DT = 5.0      # обогрев: +°C к температуре (нарастает плавно)
+VENT_DT = 1.2        # проветривание: -°C к температуре (плавно)
+VENT_HUM = 10.0      # проветривание: -% влажности (плавно)
+VENT_CO2 = 250.0     # проветривание: -ppm CO2, свежий воздух (плавно)
+LAMP_LEVEL = 22000.0   # досветка: держит МИНИМУМ света внутри (пол через max); МГНОВЕННО. -CO2 через фотосинтез
+ACT_EFF_TAU_H = 0.7  # постоянная времени плавного набора/спада эффекта обогрева и проветривания (мод.ч)
 
 
 # ---------- погода ----------
@@ -166,32 +167,41 @@ def weather_mults():
     return tm, lm, ha_target, name
 
 
-def baseline(cfg: SensorConfig, d: float, tm: float, lm: float, ha: float, cur: dict, act: dict) -> float:
-    """Целевое значение датчика: суточный ход + погода + связи + эффект актуаторов."""
-    dn = cfg.night + (cfg.day - cfg.night) * d           # суточный ход
+def act_delta(cfg: SensorConfig, act: dict) -> float:
+    """Целевая добавка от обогрева/проветривания (в publisher набирается ПЛАВНО, накопительно).
+    Досветка сюда НЕ входит - ее эффект на свет и CO2 мгновенный (в baseline)."""
     heater = act.get("heater", False)
     vent = act.get("vent", False)
+    if cfg.name == "temperature":
+        return (HEATER_DT if heater else 0.0) - (VENT_DT if vent else 0.0)
+    if cfg.name == "humidity":
+        return -(VENT_HUM if vent else 0.0)
+    if cfg.name == "co2":
+        return -(VENT_CO2 if vent else 0.0)
+    return 0.0
+
+
+def baseline(cfg: SensorConfig, d: float, tm: float, lm: float, ha: float, cur: dict, act: dict) -> float:
+    """Целевое значение датчика: суточный ход + погода + связи. Мгновенный эффект (досветка) тут;
+    плавный (обогрев/проветривание) добавляет publisher через act_delta."""
+    dn = cfg.night + (cfg.day - cfg.night) * d           # суточный ход
     lamp = act.get("lamp", False)
     if cfg.name == "light_out":
         return dn * lm                                   # свет снаружи: суточный ход * погода
     if cfg.name == "light":
         natural = dn * lm                                # свет внутри без лампы
-        return max(natural, LAMP_LEVEL) if lamp else natural   # лампа держит пол, шум добавится отдельно
+        return max(natural, LAMP_LEVEL) if lamp else natural   # лампа держит пол (мгновенно), шум отдельно
     if cfg.name == "temperature":
         hum = cur.get("humidity", 66.0)
-        base = dn * tm - 0.15 * (hum - 66.0)             # погода и влияние влажности
-        return base + (HEATER_DT if heater else 0.0) - (VENT_DT if vent else 0.0)
+        return dn * tm - 0.15 * (hum - 66.0)             # погода и влажность; обогрев/проветривание - в publisher
     if cfg.name == "co2":
-        # CO2 зависит от УРОВНЯ освещенности (с учетом досветки), проветривание снижает CO2.
-        # Круто при низком свете: дождь ночью (очень темно) часто >1200; пасмурно ночью иногда;
-        # ясно и облачно с прояснениями никогда (светлее).
+        # CO2 зависит от УРОВНЯ освещенности (с учетом досветки - мгновенно). Проветривание (плавно) - в publisher.
         light_base = (8000.0 + 34000.0 * d) * lm
         if lamp:
             light_base = max(light_base, LAMP_LEVEL)     # досветка держит пол и для фотосинтеза
         ln = max(0.0, min(1.0, (light_base - 2000.0) / 15000.0))
-        base = cfg.night - (cfg.night - cfg.day) * ln    # 1450 (темно) .. 720 (светло)
-        return base - (VENT_CO2 if vent else 0.0)
-    return dn + ha - (VENT_HUM if vent else 0.0)         # humidity: дождь вверх, проветривание вниз
+        return cfg.night - (cfg.night - cfg.day) * ln    # 1450 (темно) .. 720 (светло)
+    return dn + ha                                       # humidity: дождь вверх; проветривание - в publisher
 
 
 def connect(client_id: str) -> mqtt_client.Client:
@@ -237,6 +247,7 @@ def weather_controller():
 def publisher(cfg: SensorConfig):
     client = connect(cfg.client_id)
     noise = 0.0
+    act_eff = 0.0                                        # плавно набираемый эффект обогрева/проветривания
     ha_tracked = WEATHER[weather_state["cur"]].hum_add   # добавка влажности (асимметрия: быстро вверх, медленно вниз)
     n = 0
     print(f"  [pub:{cfg.name}] старт, топик {cfg.topic}, каждые {cfg.interval} с", flush=True)
@@ -244,9 +255,13 @@ def publisher(cfg: SensorConfig):
         while not stop_flag.is_set():
             n += 1
             tm, lm, ha_target, wname = weather_mults()
+            dt_h = cfg.interval / DAY_PERIOD_SEC * 24.0
+            with actuators_lock:
+                act = dict(actuators)
+            # плавный (накопительный) эффект обогрева/проветривания - набирается и спадает постепенно
+            act_eff += (act_delta(cfg, act) - act_eff) * min(1.0, dt_h / ACT_EFF_TAU_H)
             if cfg.name == "humidity":
                 # влажность: быстрый подъем при дожде, медленный спад после
-                dt_h = cfg.interval / DAY_PERIOD_SEC * 24.0
                 tau = HUM_RISE_TAU_H if ha_target > ha_tracked else HUM_FALL_TAU_H
                 ha_tracked += (ha_target - ha_tracked) * min(1.0, dt_h / tau)
             with force_lock:
@@ -258,11 +273,9 @@ def publisher(cfg: SensorConfig):
             else:
                 with current_lock:
                     cur = dict(current)
-                with actuators_lock:
-                    act = dict(actuators)
                 base = baseline(cfg, daylight(), tm, lm, ha_tracked, cur, act)
                 noise += -0.3 * noise + random.gauss(0.0, cfg.sigma)
-                value = round(max(cfg.lo, min(cfg.hi, base + noise)), 2)
+                value = round(max(cfg.lo, min(cfg.hi, base + act_eff + noise)), 2)
             with current_lock:
                 current[cfg.name] = value
             payload = {

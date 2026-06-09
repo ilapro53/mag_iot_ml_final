@@ -55,7 +55,7 @@ ZONE_ALPHA = 0.8        # насыщенность зон (1.0 = сплошно�
 
 # Актуаторы: на каком графике рисовать полосу-подсветку, цвет полосы и подпись.
 ACTUATORS = ["heater", "vent", "lamp"]
-ACT_AXIS = {"heater": "temperature", "vent": "humidity", "lamp": "light"}
+ACT_AXIS = {"heater": ["temperature"], "vent": ["humidity", "co2"], "lamp": ["light"]}
 ACT_COLOR = {"heater": "#FF7043", "vent": "#42A5F5", "lamp": "#FFD54F"}
 ACT_TITLE = {"heater": "обогрев", "vent": "проветривание", "lamp": "досветка"}
 ACT_ALPHA = 0.30
@@ -238,7 +238,7 @@ def main():
                     ax.axvline(mx, color="gray", linestyle="--", linewidth=1.0, alpha=0.7, zorder=2)
                 # полосы-подсветка: периоды работы актуаторов (обогрев/проветривание/досветка)
                 for a in ACTUATORS:
-                    if ACT_AXIS[a] != s:
+                    if s not in ACT_AXIS[a]:
                         continue
                     for t_on, t_off in on_spans(act_snap[a]):
                         x0 = max(ts_to_simh(t_on), h_start)
@@ -274,7 +274,7 @@ def main():
                     handles.append(Line2D([0], [0], color=COLORS["light"], lw=1.6, label="внутри"))
                     handles.append(Line2D([0], [0], color=LIGHT_OUT_COLOR, lw=1.4, ls="--", label="снаружи"))
                 for a in ACTUATORS:
-                    if ACT_AXIS[a] == s:
+                    if s in ACT_AXIS[a]:
                         handles.append(mpatches.Patch(facecolor="none", edgecolor=ACT_COLOR[a],
                                                       hatch="///", label=ACT_TITLE[a]))
                 if handles:
