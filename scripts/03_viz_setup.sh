@@ -51,5 +51,5 @@ echo " Живое окно с 4 графиками (нужен рабочий с
 echo "   ${WORKDIR}/run_viz.sh"
 echo " Сохранить PNG без окна:"
 echo "   ${WORKDIR}/run_viz.sh --save graphs.png --duration 60"
-echo " Для цветных эмодзи погоды в заголовке (опц.): sudo apt install -y fonts-noto-color-emoji"
+echo " Для эмодзи погоды в заголовке (опц., monochrome, для matplotlib): sudo apt install -y fonts-symbola"
 echo "==================================================="
