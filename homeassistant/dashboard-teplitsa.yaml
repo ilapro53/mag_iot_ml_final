@@ -110,7 +110,7 @@ views:
             hours_to_show: 24
             grid_options:
               columns: 24
-              rows: 4
+              rows: 6
           - type: history-graph
             title: Влажность
             entities:
@@ -118,7 +118,7 @@ views:
             hours_to_show: 24
             grid_options:
               columns: 24
-              rows: 4
+              rows: 6
           - type: history-graph
             title: Освещенность внутри и снаружи
             entities:
@@ -127,7 +127,7 @@ views:
             hours_to_show: 24
             grid_options:
               columns: 24
-              rows: 4
+              rows: 6
           - type: history-graph
             title: CO2
             entities:
@@ -135,7 +135,7 @@ views:
             hours_to_show: 24
             grid_options:
               columns: 24
-              rows: 4
+              rows: 6
           - type: history-graph
             title: Актуаторы (вкл/выкл)
             entities:
