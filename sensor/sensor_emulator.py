@@ -64,7 +64,7 @@ HEATER_DT = 5.0      # обогрев: +°C к температуре
 VENT_DT = 1.5        # проветривание: -°C к температуре
 VENT_HUM = 15.0      # проветривание: -% влажности
 VENT_CO2 = 300.0     # проветривание: -ppm CO2 (свежий воздух)
-LAMP_LUX = 12000.0   # досветка: +lux к свету ВНУТРИ (и косвенно -CO2 через фотосинтез)
+LAMP_LEVEL = 22000.0   # досветка: держит МИНИМУМ света внутри (пол через max, не прибавка); -CO2 через фотосинтез
 
 
 # ---------- погода ----------
@@ -175,7 +175,8 @@ def baseline(cfg: SensorConfig, d: float, tm: float, lm: float, ha: float, cur: 
     if cfg.name == "light_out":
         return dn * lm                                   # свет снаружи: суточный ход * погода
     if cfg.name == "light":
-        return dn * lm + (LAMP_LUX if lamp else 0.0)     # свет внутри + досветка (лампа)
+        natural = dn * lm                                # свет внутри без лампы
+        return max(natural, LAMP_LEVEL) if lamp else natural   # лампа держит пол, шум добавится отдельно
     if cfg.name == "temperature":
         hum = cur.get("humidity", 66.0)
         base = dn * tm - 0.15 * (hum - 66.0)             # погода и влияние влажности
@@ -184,7 +185,9 @@ def baseline(cfg: SensorConfig, d: float, tm: float, lm: float, ha: float, cur: 
         # CO2 зависит от УРОВНЯ освещенности (с учетом досветки), проветривание снижает CO2.
         # Круто при низком свете: дождь ночью (очень темно) часто >1200; пасмурно ночью иногда;
         # ясно и облачно с прояснениями никогда (светлее).
-        light_base = (8000.0 + 34000.0 * d) * lm + (LAMP_LUX if lamp else 0.0)
+        light_base = (8000.0 + 34000.0 * d) * lm
+        if lamp:
+            light_base = max(light_base, LAMP_LEVEL)     # досветка держит пол и для фотосинтеза
         ln = max(0.0, min(1.0, (light_base - 2000.0) / 15000.0))
         base = cfg.night - (cfg.night - cfg.day) * ln    # 1450 (темно) .. 720 (светло)
         return base - (VENT_CO2 if vent else 0.0)
