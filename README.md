@@ -302,7 +302,7 @@ BROKER_IP=192.168.2.205 MODE=fast bash ~/farm-sensor/02_sensor_setup.sh
 стол для окна). Одной вставкой - скачать, настроить и запустить окно:
 
 ```bash
-sudo apt install -y fonts-symbola && \
+sudo apt install -y fonts-symbola python3-tk && \
 mkdir -p ~/farm-viz && \
 wget -O ~/farm-viz/visualize.py https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/viz/visualize.py && \
 wget -O ~/farm-viz/03_viz_setup.sh https://raw.githubusercontent.com/ilapro53/mag_iot_ml_final/main/scripts/03_viz_setup.sh && \
@@ -313,8 +313,10 @@ bash ~/farm-viz/03_viz_setup.sh && \
 Скрипт ставит `uv` (он приносит Python, `paho-mqtt` и `matplotlib` из PEP 723-метаданных
 визуализатора), кладет обертку `run_viz.sh` (адрес брокера `localhost:1883` зашит) и открывает
 окно с 4 графиками. sudo не нужен. Окну нужен **рабочий стол ВМ** - запускай в графической
-сессии, не по SSH без X. Шрифт `fonts-symbola` (monochrome-эмодзи погоды в заголовке, их рисует
-matplotlib) ставится первой строкой команды выше - это единственный `sudo`-шаг визуализатора.
+сессии, не по SSH без X. Первая строка команды выше - единственный `sudo`-шаг визуализатора:
+`fonts-symbola` (monochrome-эмодзи погоды в заголовке, их рисует matplotlib) и `python3-tk`
+(tkinter; без него matplotlib не найдет графический бэкенд и молча уйдет в безоконный режим
+с предупреждением "FigureCanvasAgg is non-interactive").
 
 Полезные флаги (передаются дальше через обертку):
 

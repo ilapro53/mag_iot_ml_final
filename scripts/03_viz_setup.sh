@@ -54,5 +54,6 @@ echo " Живое окно с 4 графиками (нужен рабочий с
 echo "   ${WORKDIR}/run_viz.sh"
 echo " Сохранить PNG без окна:"
 echo "   ${WORKDIR}/run_viz.sh --save graphs.png --duration 60"
+echo " Если окно не открывается (FigureCanvasAgg is non-interactive) - нет tkinter: sudo apt install -y python3-tk"
 echo " Для эмодзи погоды в заголовке (опц., monochrome, для matplotlib): sudo apt install -y fonts-symbola"
 echo "==================================================="
