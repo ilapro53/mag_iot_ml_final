@@ -13,10 +13,19 @@
 set -e
 
 # --- параметры ---
-BROKER_IP="${BROKER_IP:-localhost}"   # на брокер-ВМ брокер - это localhost
 MQTT_PORT="${MQTT_PORT:-1883}"        # на ВМ порт 1883 (18883 был только в Docker на Windows)
 
 WORKDIR="$(cd "$(dirname "$0")" && pwd)"
+
+# BROKER_IP не задан, а run_viz.sh уже настраивали? Оставляем прежний адрес:
+# повторная установка не должна молча сбрасывать брокер на localhost.
+if [ -z "${BROKER_IP:-}" ] && [ -f "${WORKDIR}/run_viz.sh" ]; then
+    BROKER_IP="$(sed -n 's/.*--host "\([^"]*\)".*/\1/p' "${WORKDIR}/run_viz.sh" | head -n 1)"
+    if [ -n "${BROKER_IP}" ]; then
+        echo "BROKER_IP не задан - оставляю прежний адрес брокера: ${BROKER_IP}"
+    fi
+fi
+BROKER_IP="${BROKER_IP:-localhost}"   # на брокер-ВМ брокер - это localhost
 
 if [ ! -f "${WORKDIR}/visualize.py" ]; then
     echo "ОШИБКА: рядом нет visualize.py."
