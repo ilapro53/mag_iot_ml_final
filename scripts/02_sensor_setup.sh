@@ -47,10 +47,13 @@ esac
 echo "  режим: ${MODE:-normal} (DAY_PERIOD_SEC=${DAY_PERIOD_SEC}, RATE_MULT=${RATE_MULT})"
 
 echo "=== 1. Установка uv (если еще нет) ==="
-if ! command -v uv >/dev/null 2>&1 && [ ! -x "${HOME}/.local/bin/uv" ]; then
+# Проверяем не "файл существует", а "uv реально выводит версию": битый файл
+# (пустой после прерванной закачки) шелл молча исполняет как пустой скрипт.
+export PATH="${HOME}/.local/bin:${PATH}"
+if [ -z "$(uv --version 2>/dev/null)" ]; then
+    rm -f "${HOME}/.local/bin/uv" "${HOME}/.local/bin/uvx"
     wget -qO- https://astral.sh/uv/install.sh | sh
 fi
-export PATH="${HOME}/.local/bin:${PATH}"
 uv --version
 
 echo "=== 2. Конфиг .env (перезаписывается при каждой установке) ==="

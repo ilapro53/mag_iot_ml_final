@@ -25,10 +25,13 @@ if [ ! -f "${WORKDIR}/visualize.py" ]; then
 fi
 
 echo "=== 1. Установка uv (если еще нет) ==="
-if ! command -v uv >/dev/null 2>&1 && [ ! -x "${HOME}/.local/bin/uv" ]; then
+# Проверяем не "файл существует", а "uv реально выводит версию": битый файл
+# (пустой после прерванной закачки) шелл молча исполняет как пустой скрипт.
+export PATH="${HOME}/.local/bin:${PATH}"
+if [ -z "$(uv --version 2>/dev/null)" ]; then
+    rm -f "${HOME}/.local/bin/uv" "${HOME}/.local/bin/uvx"
     wget -qO- https://astral.sh/uv/install.sh | sh
 fi
-export PATH="${HOME}/.local/bin:${PATH}"
 uv --version
 
 echo "=== 2. Обертка запуска run_viz.sh (uv run, host/port брокера зашиты) ==="
